@@ -1,0 +1,380 @@
+/* ============================================================
+ * mobile.css — Responsive Mobile Styles
+ * Booking System v1.0.0
+ * Breakpoints: 768px (tablet), 480px (phone)
+ * ============================================================ */
+
+/* ===== Tablet (<= 768px) ===== */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-w: 240px;
+    --topbar-h: 52px;
+    --bottom-nav-h: 56px;
+  }
+
+  /* Show sidebar toggle & bottom nav */
+  #sidebar-toggle {
+    display: flex;
+  }
+
+  #bottom-nav {
+    display: block;
+  }
+
+  /* Sidebar becomes off-canvas drawer */
+  #sidebar {
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-xl);
+  }
+
+  #sidebar.open {
+    transform: translateX(0);
+  }
+
+  #sidebar-backdrop.visible {
+    display: block;
+  }
+
+  /* Main content takes full width */
+  #main-content {
+    margin-left: 0;
+    padding-bottom: var(--bottom-nav-h);
+  }
+
+  /* Topbar adjustments */
+  #topbar {
+    padding: 0 var(--sp-3);
+    gap: var(--sp-2);
+  }
+
+  #topbar .topbar-title h2 {
+    font-size: var(--fs-md);
+  }
+
+  #topbar .topbar-title .topbar-subtitle {
+    display: none;
+  }
+
+  #topbar .month-nav .month-display {
+    min-width: 64px;
+    font-size: var(--fs-xs);
+  }
+
+  /* Page content padding */
+  .page-content {
+    padding: var(--sp-3);
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-4);
+  }
+
+  .page-header h3 {
+    font-size: var(--fs-lg);
+  }
+
+  .page-header .page-actions {
+    justify-content: stretch;
+  }
+
+  .page-header .page-actions .btn {
+    flex: 1;
+  }
+
+  /* KPI grid: 2 columns on tablet */
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-4);
+  }
+
+  .kpi-card {
+    padding: var(--sp-3);
+  }
+
+  .kpi-card .kpi-value {
+    font-size: var(--fs-xl);
+  }
+
+  .kpi-card .kpi-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Form rows stack vertically */
+  .form-row,
+  .form-row-3 {
+    grid-template-columns: 1fr;
+    gap: var(--sp-3);
+  }
+
+  /* Filter bar wraps */
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--sp-2);
+  }
+
+  .filter-bar .filter-item {
+    width: 100%;
+  }
+
+  .filter-bar .filter-item select,
+  .filter-bar .filter-item input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .filter-bar .filter-spacer {
+    display: none;
+  }
+
+  /* Modal full width */
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal {
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    animation: modalSlideUp 0.3s var(--tr-smooth);
+  }
+
+  @keyframes modalSlideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: var(--sp-3) var(--sp-4);
+  }
+
+  .modal-footer {
+    flex-direction: column-reverse;
+  }
+
+  .modal-footer .btn {
+    width: 100%;
+  }
+
+  /* Calendar: simplified */
+  .calendar-cell {
+    min-height: 50px;
+  }
+
+  .calendar-booking-chip {
+    font-size: 9px;
+    padding: 1px 3px;
+  }
+
+  /* Toast: bottom on mobile */
+  #toast-container {
+    top: auto;
+    bottom: calc(var(--bottom-nav-h) + var(--sp-3));
+    right: var(--sp-3);
+    left: var(--sp-3);
+    max-width: none;
+  }
+
+  .toast {
+    min-width: 0;
+  }
+
+  /* Shortcut list: single column */
+  .shortcut-list {
+    grid-template-columns: 1fr;
+  }
+
+  /* Stat row */
+  .stat-row {
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+  }
+
+  /* Search box full width */
+  .search-box {
+    width: 100%;
+  }
+}
+
+/* ===== Phone (<= 480px) ===== */
+@media (max-width: 480px) {
+  :root {
+    --fs-base: 0.875rem;
+    --fs-sm: 0.75rem;
+  }
+
+  /* KPI grid: single column on small phones, but 2 for compact */
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .kpi-card {
+    padding: var(--sp-2) var(--sp-3);
+  }
+
+  .kpi-card .kpi-value {
+    font-size: var(--fs-lg);
+  }
+
+  .kpi-card .kpi-label {
+    font-size: var(--fs-xs);
+  }
+
+  .kpi-card .kpi-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .kpi-card .kpi-sub {
+    display: none;
+  }
+
+  /* Table: smaller padding */
+  .data-table thead th,
+  .data-table tbody td {
+    padding: var(--sp-2) var(--sp-2);
+  }
+
+  .data-table {
+    font-size: var(--fs-xs);
+    min-width: 500px;
+  }
+
+  /* Calendar: even more compact */
+  .calendar-cell {
+    min-height: 40px;
+    padding: 1px;
+  }
+
+  .calendar-day-num {
+    font-size: 9px;
+  }
+
+  .calendar-booking-chip {
+    font-size: 8px;
+    padding: 0 2px;
+  }
+
+  /* Quick filters: scrollable */
+  .quick-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: var(--sp-1);
+  }
+
+  .quick-filter-btn {
+    flex-shrink: 0;
+  }
+
+  /* Login card */
+  .login-card {
+    padding: var(--sp-8) var(--sp-6);
+    margin: var(--sp-4);
+  }
+
+  /* Page header */
+  .page-header h3 {
+    font-size: var(--fs-md);
+  }
+
+  /* Topbar: hide month nav subtitle */
+  #topbar .month-nav {
+    padding: 2px 4px;
+  }
+
+  #topbar .month-nav button {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* Bot log entries */
+  .bot-log-entry {
+    padding: var(--sp-2) var(--sp-3);
+  }
+
+  .bot-log-entry .log-avatar {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* ===== Landscape Phone ===== */
+@media (max-width: 768px) and (orientation: landscape) {
+  .modal-overlay {
+    align-items: center;
+    padding: var(--sp-4);
+  }
+
+  .modal {
+    max-width: 500px;
+    max-height: 85vh;
+    border-radius: var(--radius-xl);
+    animation: modalSlideIn 0.3s var(--tr-smooth);
+  }
+}
+
+/* ===== Print ===== */
+@media print {
+  #sidebar,
+  #topbar,
+  #bottom-nav,
+  #sidebar-toggle,
+  #sidebar-backdrop,
+  #toast-container,
+  .filter-bar,
+  .page-actions,
+  .action-cell {
+    display: none !important;
+  }
+
+  #main-content {
+    margin-left: 0;
+    padding: 0;
+  }
+
+  .page-content {
+    display: block !important;
+    padding: 0;
+  }
+
+  body {
+    background: white;
+    color: black;
+  }
+
+  .data-table-wrap,
+  .card {
+    border: 1px solid #ccc;
+    background: white;
+  }
+
+  .data-table thead th {
+    background: #f0f0f0;
+    color: black;
+  }
+
+  .data-table tbody td {
+    color: black;
+    border-bottom: 1px solid #ddd;
+  }
+}
+
+/* ===== Reduced Motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "booking-system",
+  "version": "1.0.0",
+  "description": "VIP Casino Hotel Booking Management System",
+  "main": "build.js",
+  "scripts": {
+    "build": "node build.js",
+    "test": "node build.js",
+    "bot": "node bot/bot.js",
+    "start": "node bot/bot.js"
+  },
+  "keywords": ["booking", "casino", "hotel", "firebase", "telegram"],
+  "author": "",
+  "license": "MIT"
+}
