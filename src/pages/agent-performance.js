@@ -181,7 +181,7 @@ var AgentPerfPage = (function () {
     });
 
     var html = '<div style="margin-bottom:var(--sp-2);color:var(--text-muted);font-size:var(--fs-xs);">';
-    html += '折抵天數 = 客戶轉碼 ÷ 每晚門檻（無條件退位）。若折抵天數 ≥ 入住天數，顯示「達標」';
+    html += '折抵天數 = 客戶轉碼 ÷ 每晚門檻（無條件退位）。轉碼金額請至「費用收取」頁面填寫。';
     html += '</div>';
     html += '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint scrollable">';
     html += '<table class="data-table"><thead><tr>';
@@ -204,18 +204,21 @@ var AgentPerfPage = (function () {
       var totalThWan = Math.round(totalTh / 10000);
 
       var vol = Number(b.volume) || 0;
-      var volWan = Math.round(vol / 10000);
+      var volWan = vol > 0 ? Math.round(vol / 10000) : 0;
 
       /* Discount days = floor(volume / threshold) */
       var discountDays = 0;
       if (vol > 0 && th > 0) {
         discountDays = Math.floor(vol / th);
       }
-      var discountLabel = discountDays === 0 ? '不足1' : discountDays;
+      var discountLabel = (vol > 0 && discountDays === 0) ? '不足1' : (vol > 0 ? discountDays : '-');
 
       var remaining = n - discountDays;
       var remainingLabel, remainingStyle;
-      if (remaining <= 0) {
+      if (vol === 0) {
+        remainingLabel = '-';
+        remainingStyle = 'color:var(--text-muted);';
+      } else if (remaining <= 0) {
         remainingLabel = '達標';
         remainingStyle = 'color:var(--color-success);font-weight:700;';
       } else {
@@ -232,13 +235,7 @@ var AgentPerfPage = (function () {
       html += '<td style="text-align:center;">' + n + '</td>';
       html += '<td style="text-align:right;">' + thWan + '</td>';
       html += '<td style="text-align:right;">' + totalThWan + '</td>';
-      html += '<td style="text-align:right;">';
-      html += '<input type="number" min="0" step="1" ';
-      html += 'style="width:70px;text-align:right;padding:2px 6px;font-size:var(--fs-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-primary);" ';
-      html += 'value="' + (volWan || '') + '" ';
-      html += 'onchange="updateBookingVolume(\'' + (b._fbKey || '') + '\', this.value)" ';
-      html += 'placeholder="萬">';
-      html += '</td>';
+      html += '<td style="text-align:right;' + (vol === 0 ? 'color:var(--text-muted);' : '') + '">' + (vol > 0 ? volWan : '-') + '</td>';
       html += '<td style="text-align:center;">' + discountLabel + '</td>';
       html += '<td style="text-align:center;' + remainingStyle + '">' + remainingLabel + '</td>';
       html += '<td>' + statusLabel + '</td>';

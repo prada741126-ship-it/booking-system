@@ -345,16 +345,16 @@ function runTests() {
     assert(tpl.indexOf('#f0f2f5') !== -1, 'Should use light theme-color #f0f2f5');
   });
 
-  test('Template version label is v2.0.5', function () {
+  test('Template version label is v2.0.7', function () {
     var tpl = readFile(TEMPLATE);
-    assert(tpl.indexOf('v2.0.5') !== -1, 'Version label should be v2.0.5');
+    assert(tpl.indexOf('v2.0.7') !== -1, 'Version label should be v2.0.7');
   });
 
   /* ===== Test: constants.js defines required constants ===== */
   test('constants.js defines APP', function () {
     var src = getSrc('src/core/constants.js');
     assert(src.indexOf('var APP') !== -1, 'Missing APP');
-    assert(src.indexOf("VERSION: '2.0.5'") !== -1, 'APP.VERSION should be 2.0.5');
+    assert(src.indexOf("VERSION: '2.0.7'") !== -1, 'APP.VERSION should be 2.0.7');
   });
 
   test('constants.js defines CONFIG with v8 settings', function () {

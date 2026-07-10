@@ -299,22 +299,6 @@ function editBooking(fbKey) {
   }, 50);
 }
 
-function updateBookingVolume(fbKey, wanValue) {
-  try {
-    var raw = Number(wanValue) || 0;
-    if (raw < 0) raw = 0;
-    var volume = raw * 10000;
-    var updated = Bookings.update(fbKey, { volume: volume });
-    if (updated) {
-      Toast.show('客戶轉碼已更新');
-      renderAgentPerformance();
-    }
-  } catch (e) {
-    console.error('[Bridge] updateBookingVolume error:', e);
-    Toast.show('更新失敗', 'error');
-  }
-}
-
 function viewBookingDetail(fbKey) {
   var b = Bookings.getByKey(fbKey);
   if (!b) { Toast.error('\u627e\u4e0d\u5230\u8a02\u623f\u8a18\u9304'); return; }
