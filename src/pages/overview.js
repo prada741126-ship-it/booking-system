@@ -17,8 +17,8 @@ var OverviewPage = (function () {
     var summ = Stats.summary(monthBookings);
     var total = summ.totalBookings;
 
-    /* Recent bookings: show ALL bookings (cross-month visible), sorted by creation time */
-    var recent = Filters.sortBookings(allBookings, '_createdAt', false).slice(0, 8);
+    /* Recent bookings: filtered by check-in month (original logic), but show creation date */
+    var recent = Filters.sortBookings(monthBookings, '_createdAt', false).slice(0, 8);
 
     var html = '';
 
@@ -97,7 +97,7 @@ var OverviewPage = (function () {
     } else {
       html += '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint' + (recent.length > 0 ? ' scrollable' : '') + '">';
       html += '<table class="data-table"><thead><tr>';
-      html += '<th>客人</th><th>體系</th><th>入住</th><th>退房</th><th>晚</th><th>代理</th><th>費用</th><th>狀態</th>';
+      html += '<th>客人</th><th>體系</th><th>入住</th><th>退房</th><th>晚</th><th>代理</th><th>費用</th><th>狀態</th><th>創建日期</th><th>登錄人</th>';
       html += '</tr></thead><tbody>';
       for (var i = 0; i < recent.length; i++) {
         html += _recentRow(recent[i]);
@@ -155,8 +155,19 @@ var OverviewPage = (function () {
     html += '<td>' + Utils.escapeHtml(b.agent || '-') + '</td>';
     html += '<td><span class="fee-badge ' + (b.feeStatus || 'free') + '">' + (FEE_TYPE_LABELS[b.feeStatus] || '免費') + '</span></td>';
     html += '<td>' + _statusBadge(b.status) + '</td>';
+    html += '<td style="font-size:var(--fs-sm);white-space:nowrap;">' + _fmtTimestamp(b._createdAt) + '</td>';
+    html += '<td style="font-size:var(--fs-sm);">' + Utils.escapeHtml(b.createdBy || b.employee || '-') + '</td>';
     html += '</tr>';
     return html;
+  }
+
+  /* Format timestamp (Date.now) to MM/DD */
+  function _fmtTimestamp(ts) {
+    if (!ts) return '-';
+    var d = new Date(ts);
+    var mm = d.getMonth() + 1;
+    var dd = d.getDate();
+    return (mm < 10 ? '0' : '') + mm + '/' + (dd < 10 ? '0' : '') + dd;
   }
 
   function _statusBadge(status) {

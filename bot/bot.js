@@ -1250,6 +1250,9 @@ function submitBooking(chatId, userId, session, user) {
   var month = getMonthStr(d.checkIn) || currentMonth();
   var bookingNo = generateBookingNo();
 
+  var emp = getEmployeeByTgId(userId);
+  var createdBy = emp ? emp.name : (user ? (user.first_name || user.username || '') : '');
+
   var booking = {
     _fbKey:        fbKey,
     _createdAt:    now,
@@ -1257,6 +1260,7 @@ function submitBooking(chatId, userId, session, user) {
     _source:       'bot',
 
     bookingNo:     bookingNo,
+    createdBy:   createdBy,
 
     guestName:     d.guestName || '',
     agent:         d.agent || '',
