@@ -360,7 +360,7 @@ var SHORTCUTS = [
 
 /* ===== Default Password (SHA-256 hash of 'admin123') ===== */
 /* Will be compared via CryptoJS.SHA256 */
-var DEFAULT_PASSWORD_HASH = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
+var DEFAULT_PASSWORD_HASH = 'dd3a2aecd47cbb7fab47cdbf84a6daf707cc02e8cdf4a4dc63b169056901a598';
 
 /* ===== Terms ===== */
 var TERMS = {
