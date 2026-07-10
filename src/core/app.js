@@ -19,6 +19,9 @@ var App = (function () {
     /* 3. Initialize hotel config with presets if empty */
     initHotelConfig();
 
+    /* 3.5 Initialize agent list with presets if empty */
+    initAgentList();
+
     /* 4. Set up event listeners */
     setupEventListeners();
 
@@ -59,10 +62,34 @@ var App = (function () {
   }
 
   function initHotelConfig() {
-    var hc = State.get('hotelConfig');
-    if (!hc || !hc.casinos || hc.casinos.length === 0) {
-      console.log('[App] Hotel config empty, loading presets...');
-      Hotels.loadPresets();
+    try {
+      var hc = State.get('hotelConfig');
+      if (!hc || !hc.casinos || hc.casinos.length === 0) {
+        console.log('[App] Hotel config empty, loading presets...');
+        Hotels.loadPresets();
+      } else {
+        console.log('[App] Hotel config loaded: ' + hc.casinos.length + ' casinos');
+      }
+    } catch (e) {
+      console.error('[App] initHotelConfig error:', e);
+      /* Last resort: try loading presets directly */
+      try {
+        Hotels.loadPresets();
+        console.log('[App] Hotel presets loaded after error recovery');
+      } catch (e2) {
+        console.error('[App] Hotel presets load also failed:', e2);
+      }
+    }
+  }
+
+  function initAgentList() {
+    var list = State.get('agentList');
+    if (!list || list.length === 0) {
+      console.log('[App] Agent list empty, loading default agents...');
+      var defaults = ['王大帥', 'Fifi', 'Ring', 'Yuka', '安', '韓國'];
+      for (var i = 0; i < defaults.length; i++) {
+        Agents.add(defaults[i]);
+      }
     }
   }
 
@@ -128,10 +155,10 @@ var App = (function () {
       overview: 'renderOverview',
       profit: 'renderProfit',
       fees: 'renderFees',
-      agentPerformance: 'renderAgentPerformance',
+      'agent-performance': 'renderAgentPerformance',
       archives: 'renderArchives',
       employees: 'renderEmployees',
-      hotelConfig: 'renderHotelConfig'
+      'hotel-config': 'renderHotelConfig'
     };
     var fn = map[pageId];
     if (fn && typeof window[fn] === 'function') {

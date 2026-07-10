@@ -11,54 +11,85 @@ var HotelConfigPage = (function () {
     var container = document.getElementById('page-hotel-config');
     if (!container) return;
 
-    var hc = Hotels.getAll();
-    if (!hc || !hc.casinos) {
-      container.innerHTML = '<div class="empty-state"><div class="empty-title">酒店配置未載入</div><button class="btn btn-primary" onclick="HotelConfigPage.loadPresets()">載入預設</button></div>';
-      return;
+    try {
+      var hc = Hotels.getAll();
+
+      /* Auto-load presets if config is empty */
+      if (!hc || !hc.casinos || hc.casinos.length === 0) {
+        console.log('[HotelConfigPage] Config empty, auto-loading presets...');
+        try {
+          Hotels.loadPresets();
+          hc = Hotels.getAll();
+        } catch (e) {
+          console.error('[HotelConfigPage] Auto-load presets failed:', e);
+        }
+      }
+
+      /* If still empty after auto-load, show help */
+      if (!hc || !hc.casinos || hc.casinos.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding:var(--sp-12) var(--sp-4);">' +
+          '<div class="empty-icon"><svg viewBox="0 0 24 24" width="64" height="64"><path d="M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z"/></svg></div>' +
+          '<div class="empty-title" style="font-size:var(--fs-lg);margin-bottom:var(--sp-2);">尚無酒店配置</div>' +
+          '<div class="empty-desc" style="margin-bottom:var(--sp-4);">點擊下方按鈕載入預設的 6 大體系、15 間酒店配置</div>' +
+          '<button class="btn btn-primary btn-lg" onclick="HotelConfigPage.loadPresets()" style="font-size:var(--fs-md);padding:var(--sp-3) var(--sp-8);">載入預設配置</button>' +
+          '<div style="margin-top:var(--sp-3);font-size:var(--fs-xs);color:var(--text-muted);">載入後即可編輯每家酒店的房型門檻設定</div>' +
+          '</div>';
+        return;
+      }
+
+      var html = '';
+
+      /* Page header */
+      html += '<div class="page-header">';
+      html += '  <h3>酒店設定 <span style="font-size:var(--fs-sm);color:var(--text-muted);font-weight:400;">v' + Utils.escapeHtml(hc.version || '?') + '</span></h3>';
+      html += '  <div class="page-actions">';
+      html += '    <button class="btn btn-secondary" onclick="HotelConfigPage.showAddCasino()">';
+      html += '      <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>';
+      html += '      新增體系';
+      html += '    </button>';
+      html += '    <button class="btn btn-ghost" onclick="HotelConfigPage.confirmReset()" data-tooltip="重置為預設">重置預設</button>';
+      html += '  </div>';
+      html += '</div>';
+
+      /* Summary KPI */
+      var totalHotels = 0;
+      for (var i = 0; i < hc.casinos.length; i++) {
+        var c = hc.casinos[i];
+        if (c && Array.isArray(c.hotels)) {
+          totalHotels += c.hotels.length;
+        }
+      }
+      html += '<div class="kpi-grid">';
+      html += _kpiCard('kpi-blue', '酒店體系', hc.casinos.length, '個', '新濠/金沙/銀河等',
+        '<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>');
+      html += _kpiCard('kpi-green', '酒店總數', totalHotels, '間', '各體系下酒店',
+        '<svg viewBox="0 0 24 24"><path d="M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z"/></svg>');
+      html += _kpiCard('kpi-gold', '房型種類', ROOM_TYPES.length, '種', '所有酒店共用',
+        '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>');
+      html += '</div>';
+
+      /* Tree view */
+      html += '<div class="hc-tree">';
+
+      for (var ci = 0; ci < hc.casinos.length; ci++) {
+        var casino = hc.casinos[ci];
+        if (casino) {
+          html += _casinoBlock(casino);
+        }
+      }
+
+      html += '</div>';
+
+      container.innerHTML = html;
+    } catch (e) {
+      console.error('[HotelConfigPage] render error:', e);
+      container.innerHTML = '<div class="empty-state"><div class="empty-title">渲染出錯</div><div class="empty-desc">' + Utils.escapeHtml(e.message) + '</div><button class="btn btn-primary" style="margin-top:12px" onclick="HotelConfigPage.loadPresets()">重新載入預設</button></div>';
     }
-
-    var html = '';
-
-    /* Page header */
-    html += '<div class="page-header">';
-    html += '  <h3>酒店設定 <span style="font-size:var(--fs-sm);color:var(--text-muted);font-weight:400;">v' + Utils.escapeHtml(hc.version || '?') + '</span></h3>';
-    html += '  <div class="page-actions">';
-    html += '    <button class="btn btn-secondary" onclick="HotelConfigPage.showAddCasino()">';
-    html += '      <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>';
-    html += '      新增體系';
-    html += '    </button>';
-    html += '    <button class="btn btn-ghost" onclick="HotelConfigPage.confirmReset()" data-tooltip="重置為預設">重置預設</button>';
-    html += '  </div>';
-    html += '</div>';
-
-    /* Summary KPI */
-    var totalHotels = 0;
-    for (var i = 0; i < hc.casinos.length; i++) {
-      totalHotels += hc.casinos[i].hotels.length;
-    }
-    html += '<div class="kpi-grid">';
-    html += _kpiCard('kpi-blue', '酒店體系', hc.casinos.length, '個', '新濠/金沙/銀河等',
-      '<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>');
-    html += _kpiCard('kpi-green', '酒店總數', totalHotels, '間', '各體系下酒店',
-      '<svg viewBox="0 0 24 24"><path d="M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z"/></svg>');
-    html += _kpiCard('kpi-gold', '房型種類', ROOM_TYPES.length, '種', '所有酒店共用',
-      '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>');
-    html += '</div>';
-
-    /* Tree view */
-    html += '<div class="hc-tree">';
-
-    for (var ci = 0; ci < hc.casinos.length; ci++) {
-      var casino = hc.casinos[ci];
-      html += _casinoBlock(casino);
-    }
-
-    html += '</div>';
-
-    container.innerHTML = html;
   }
 
   function _casinoBlock(casino) {
+    if (!casino) return '';
+    var hotels = Array.isArray(casino.hotels) ? casino.hotels : [];
     var html = '<div class="hc-casino-block">';
     html += '  <div class="hc-casino-header">';
     html += '    <div style="display:flex;align-items:center;gap:var(--sp-2);">';

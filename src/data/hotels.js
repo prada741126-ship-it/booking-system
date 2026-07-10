@@ -237,7 +237,11 @@ var Hotels = {
     };
     State.set('hotelConfig', config);
     Store.saveHotelConfig(config);
-    syncHCToFirebase(config);
+    try {
+      syncHCToFirebase(config);
+    } catch (e) {
+      console.error('[Hotels] syncHCToFirebase error (non-critical):', e);
+    }
     Events.emit(EVENTS.HC_LOADED, config);
     console.log('[Hotels] Presets loaded:', config.casinos.length, 'casinos');
     return config;

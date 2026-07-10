@@ -190,15 +190,15 @@ function answerCallback(callbackId, text) {
   });
 }
 
-/* Set bot commands menu */
+/* Set bot commands menu (English commands only, Chinese descriptions) */
 function setBotCommands() {
   var commands = [
-    { command: '新增授权', description: '管理员授权新员工 [管理员]' },
-    { command: '订房',     description: '开始订房流程' },
-    { command: '确认号',   description: '填入确认编号' },
-    { command: '修改',     description: '修改订房资料' },
-    { command: '取消',     description: '取消订房' },
-    { command: '查询',     description: '查询订房记录' }
+    { command: 'newauth',   description: '管理员授权新员工 [管理员]' },
+    { command: 'book',      description: '开始订房流程' },
+    { command: 'confirmno', description: '填入确认编号' },
+    { command: 'modify',    description: '修改订房资料' },
+    { command: 'cancel',    description: '取消订房' },
+    { command: 'query',     description: '查询订房记录' }
   ];
   tgRequest('setMyCommands', { commands: commands }, function (err) {
     if (err) {
@@ -405,9 +405,12 @@ function getThreshold(casinoName, hotelName, roomType) {
   return (rc[roomType] && rc[roomType].threshold) ? rc[roomType].threshold : 0;
 }
 
+/* Default agent list (fallback when Firebase is empty) */
+var DEFAULT_AGENTS = ['王大帥', 'Fifi', 'Ring', 'Yuka', '安', '韓國'];
+
 /* Agent list helpers (from cache) */
 function getActiveAgents() {
-  if (!cache.agentList) return [];
+  if (!cache.agentList) return DEFAULT_AGENTS.slice();
   var agents = [];
   for (var key in cache.agentList) {
     if (cache.agentList.hasOwnProperty(key)) {
@@ -417,6 +420,8 @@ function getActiveAgents() {
       }
     }
   }
+  /* Fallback to default if Firebase has data but all inactive or empty */
+  if (agents.length === 0) return DEFAULT_AGENTS.slice();
   return agents;
 }
 
@@ -742,6 +747,11 @@ var STEPS = {
   BOOKING_HOTEL:     'booking_hotel',
   BOOKING_ROOM:      'booking_room',
   BOOKING_AGENT:     'booking_agent',
+  BOOKING_GUEST:     'booking_guest',
+  BOOKING_CHECKIN:   'booking_checkin',
+  BOOKING_CHECKOUT:  'booking_checkout',
+  BOOKING_SMOKING:   'booking_smoking',
+  BOOKING_REMARK:    'booking_remark',
   BOOKING_PICKUP:    'booking_pickup',
   BOOKING_CONFIRM:   'booking_confirm',
   CONFIRMNO_SELECT:  'confirmno_select',
@@ -770,6 +780,15 @@ function checkAuth(msg, callback) {
 
   ensureCacheFresh(function () {
     if (!isAuthorized(userId)) {
+      /* v8: First user auto-registers as admin */
+      if (_isFirstUser()) {
+        _autoRegisterAdmin(msg.from);
+        setTimeout(function () {
+          checkAuth(msg, callback);
+        }, 500);
+        return;
+      }
+
       sendMessage(msg.chat.id,
         '⛔ 您尚未授权使用此机器人。\n\n' +
         '请联络管理员进行授权。\n' +
@@ -792,6 +811,16 @@ function handleStart(msg) {
 
   ensureCacheFresh(function () {
     if (!isAuthorized(user.id)) {
+      /* v8: First user to contact the bot becomes admin automatically */
+      if (_isFirstUser()) {
+        _autoRegisterAdmin(user);
+        /* Re-check auth after auto-registration */
+        setTimeout(function () {
+          handleStart(msg);
+        }, 500);
+        return;
+      }
+
       sendMessage(chatId,
         '👋 欢迎来到 <b>BookingHub 订房系统</b>！\n\n' +
         '您尚未授权使用此机器人。\n' +
@@ -810,6 +839,59 @@ function handleStart(msg) {
     text += '请选择以下操作：';
 
     sendMessage(chatId, text, mainMenuKB(emp));
+  });
+}
+
+/* Check if this is the first user (no employees exist yet) */
+function _isFirstUser() {
+  if (!cache.employeeList) return true;
+  /* Check if any active employees exist */
+  for (var key in cache.employeeList) {
+    if (cache.employeeList.hasOwnProperty(key)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/* Auto-register the first user as admin */
+function _autoRegisterAdmin(user) {
+  var now = Date.now();
+  var fbKey = generateFbKey();
+
+  var employee = {
+    id: 'EP' + now.toString(36) + crypto.randomBytes(3).toString('hex'),
+    _fbKey: fbKey,
+    _createdAt: now,
+    _updatedAt: now,
+    tgId: String(user.id),
+    name: getDisplayName(user),
+    role: EMPLOYEE_ROLES.ADMIN,
+    active: true,
+    authorizedAt: new Date().toISOString()
+  };
+
+  /* Write to Firebase employeeList */
+  fbPut(CONFIG.FIREBASE.PATHS.EMPLOYEE_LIST + '/' + encodeURIComponent(fbKey), employee, function (err) {
+    if (err) {
+      console.error('[Auth] Failed to auto-register first admin:', err);
+      return;
+    }
+
+    /* Update cache */
+    if (!cache.employeeList) cache.employeeList = {};
+    cache.employeeList[fbKey] = employee;
+
+    /* Write bot log */
+    writeBotLog({
+      _fbKey:     generateFbKey(),
+      _createdAt: now,
+      action:     'first_admin_auto',
+      message:    '首个用户自动授权为管理员：' + getDisplayName(user) + ' (TG ID: ' + user.id + ')',
+      userId:     user.id
+    });
+
+    console.log('[Auth] First user auto-registered as admin: ' + getDisplayName(user) + ' (TG ID: ' + user.id + ')');
   });
 }
 
@@ -1012,6 +1094,69 @@ function agentKB(employeeId) {
 
   rows.push([{ text: '⬅️ 返回', callback_data: 'book_back_room' }]);
   return kb(rows);
+}
+
+/* After agent selected, check missing info and guide user */
+function proceedAfterAgent(chatId, session) {
+  var d = session.data;
+  if (!d.guestName) {
+    session.step = STEPS.BOOKING_GUEST;
+    sendMessage(chatId,
+      '✅ 代理：<b>' + escapeHtml(d.agent) + '</b>\n\n' +
+      '请输入<b>客人姓名</b>：'
+    );
+    return;
+  }
+  if (!d.checkIn) {
+    session.step = STEPS.BOOKING_CHECKIN;
+    sendMessage(chatId,
+      '✅ 客人：<b>' + escapeHtml(d.guestName) + '</b>\n\n' +
+      '请输入<b>入住日期</b>（MM/DD 或 YYYY-MM-DD）：'
+    );
+    return;
+  }
+  if (!d.checkOut) {
+    session.step = STEPS.BOOKING_CHECKOUT;
+    sendMessage(chatId,
+      '✅ 入住：<b>' + d.checkIn + '</b>\n\n' +
+      '请输入<b>退房日期</b>（MM/DD 或 YYYY-MM-DD）：'
+    );
+    return;
+  }
+  if (!d.nights) {
+    d.nights = calcNights(d.checkIn, d.checkOut);
+  }
+  /* Smoking preference — if already set, skip to remark */
+  if (!d.smoking || d.smoking === 'unspecified') {
+    session.step = STEPS.BOOKING_SMOKING;
+    sendMessage(chatId,
+      '请选择<b>吸烟偏好</b>：',
+      kb([
+        [
+          { text: '🚬 吸烟', callback_data: 'book_smoke:smoking' },
+          { text: '🚭 禁烟', callback_data: 'book_smoke:non-smoking' },
+          { text: '❓ 未指定', callback_data: 'book_smoke:unspecified' }
+        ],
+        [{ text: '⬅️ 返回', callback_data: 'book_back_agent' }]
+      ])
+    );
+    return;
+  }
+  /* Remark — if already set, skip to pickup */
+  if (!d.remark) {
+    session.step = STEPS.BOOKING_REMARK;
+    sendMessage(chatId,
+      '✅ 吸烟：<b>' + (d.smoking === 'smoking' ? '吸烟' : d.smoking === 'non-smoking' ? '禁烟' : '未指定') + '</b>\n\n' +
+      '请输入<b>备注</b>（或输入「无」跳过）：'
+    );
+    return;
+  }
+  /* All info complete → pickup */
+  session.step = STEPS.BOOKING_PICKUP;
+  sendMessage(chatId,
+    '✅ 代理：<b>' + escapeHtml(d.agent) + '</b>\n\n' +
+    '请输入<b>举牌名称</b>（或输入「无」跳过）：'
+  );
 }
 
 /* Confirm keyboard */
@@ -1856,7 +2001,12 @@ function handleCallback(cb) {
   /* Ensure authorized */
   ensureCacheFresh(function () {
     if (!isAuthorized(userId)) {
-      sendMessage(chatId, '⛔ 您尚未授权。您的 TG ID: <code>' + userId + '</code>');
+      if (_isFirstUser()) {
+        _autoRegisterAdmin(user);
+        sendMessage(chatId, '🔑 您已成为首位管理员！请重新发送 /start。');
+      } else {
+        sendMessage(chatId, '⛔ 您尚未授权。您的 TG ID: <code>' + userId + '</code>');
+      }
       return;
     }
 
@@ -1883,7 +2033,7 @@ function handleCallback(cb) {
 
     /* Casino selection */
     if (data.indexOf('casino:') === 0) {
-      var casino = data.substring(6);
+      var casino = data.substring(7);
       if (!session) session = createSession(userId, chatId);
       session.data.casino = casino;
       session.step = STEPS.BOOKING_HOTEL;
@@ -1953,10 +2103,31 @@ function handleCallback(cb) {
       var agent = data.substring(6);
       if (session) {
         session.data.agent = agent;
-        session.step = STEPS.BOOKING_PICKUP;
+        proceedAfterAgent(chatId, session);
+      }
+      return;
+    }
+
+    /* Back to agent */
+    if (data === 'book_back_agent') {
+      if (session) {
+        session.step = STEPS.BOOKING_AGENT;
+        var emp2 = getEmployeeByTgId(userId);
+        var empId2 = emp2 ? emp2.id : String(userId);
+        sendMessage(chatId, '请选择<b>所属代理</b>：', agentKB(empId2));
+      }
+      return;
+    }
+
+    /* Booking smoking preference */
+    if (data.indexOf('book_smoke:') === 0) {
+      var smokeVal = data.substring(11);
+      if (session) {
+        session.data.smoking = smokeVal;
+        session.step = STEPS.BOOKING_REMARK;
         sendMessage(chatId,
-          '✅ 代理：<b>' + escapeHtml(agent) + '</b>\n\n' +
-          '请输入<b>举牌名称</b>（或输入「无」跳过）：'
+          '✅ 吸烟：<b>' + (smokeVal === 'smoking' ? '吸烟' : smokeVal === 'non-smoking' ? '禁烟' : '未指定') + '</b>\n\n' +
+          '请输入<b>备注</b>（或输入「无」跳过）：'
         );
       }
       return;
@@ -2144,6 +2315,50 @@ function handleText(msg) {
     switch (session.step) {
       case STEPS.BOOKING_WAIT_TEXT:
         handleBookingText(userId, chatId, text, msg.from);
+        break;
+
+      case STEPS.BOOKING_GUEST:
+        session.data.guestName = text.trim();
+        if (!session.data.guestName) {
+          sendMessage(chatId, '❌ 客人姓名不能为空，请重新输入：');
+          break;
+        }
+        proceedAfterAgent(chatId, session);
+        break;
+
+      case STEPS.BOOKING_CHECKIN:
+        var ci = parseDate(text.trim());
+        if (!ci) {
+          sendMessage(chatId, '❌ 日期格式错误，请重新输入（MM/DD 或 YYYY-MM-DD）：');
+          break;
+        }
+        session.data.checkIn = ci;
+        proceedAfterAgent(chatId, session);
+        break;
+
+      case STEPS.BOOKING_CHECKOUT:
+        var co = parseDate(text.trim());
+        if (!co) {
+          sendMessage(chatId, '❌ 日期格式错误，请重新输入（MM/DD 或 YYYY-MM-DD）：');
+          break;
+        }
+        if (co <= session.data.checkIn) {
+          sendMessage(chatId, '❌ 退房日期必须在入住日期之后，请重新输入：');
+          break;
+        }
+        session.data.checkOut = co;
+        session.data.nights = calcNights(session.data.checkIn, session.data.checkOut);
+        proceedAfterAgent(chatId, session);
+        break;
+
+      case STEPS.BOOKING_REMARK:
+        var remark = text.trim();
+        session.data.remark = (remark === '无' || remark === '無' || remark.toLowerCase() === 'none') ? '' : remark;
+        session.step = STEPS.BOOKING_PICKUP;
+        sendMessage(chatId,
+          '✅ 备注已记录\n\n' +
+          '请输入<b>举牌名称</b>（或输入「无」跳过）：'
+        );
         break;
 
       case STEPS.BOOKING_PICKUP:
