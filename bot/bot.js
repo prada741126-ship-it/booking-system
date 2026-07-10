@@ -723,36 +723,65 @@ function parseBulkConfirmNumbers(text) {
 
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i];
-    /* Skip lines that look like headers or labels */
-    if (line.match(/登记人|入住|退房|酒店|备注|确认|booking|check/i)) continue;
+    /* Skip lines that are obviously headers/labels (no digits at all) */
+    if (!/\d/.test(line)) continue;
 
-    /* Try to extract confirm number and name */
-    /* Pattern: confirmNo (8-12 chars alphanumeric/digits) followed by name */
-    var match = line.match(/^([A-Za-z0-9]{6,14})\s+(.+)$/);
-    if (!match) {
-      /* Alternative: number anywhere in line, name after it */
-      match = line.match(/\b([A-Za-z0-9]{6,14})\b.*\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/i);
-      if (match) {
-        results.push({ confirmNo: match[1], name: match[2].trim() });
-      }
-      continue;
+    var parsed = parseConfirmLine(line);
+    if (parsed) {
+      results.push(parsed);
     }
-
-    var confirmNo = match[1];
-    var rest = match[2].trim();
-
-    /* Extract name from rest — look for English/Chinese name */
-    var nameMatch = rest.match(/([A-Za-z\u4e00-\u9fa5][A-Za-z\s,\-]*[A-Za-z])/);
-    var name = nameMatch ? nameMatch[1].trim() : rest;
-
-    /* Validate confirmNo: should contain mostly digits or be alphanumeric */
-    if (/^[A-Za-z]+$/.test(confirmNo)) continue; /* Skip pure letters */
-    if (confirmNo.length < 6) continue;
-
-    results.push({ confirmNo: confirmNo, name: name });
   }
 
   return results;
+}
+
+/**
+ * Parse a single line into { confirmNo, name }.
+ * Handles BOTH orders:
+ *   "31082710  Huang Yi Lun"   → confirm number first
+ *   "Huang Yi Lun  31082710"   → name first
+ *   "A12345678  Chang yin ting" → alphanumeric confirm number
+ * Token-based: finds the confirm-number-like token, everything else is the name.
+ */
+function parseConfirmLine(line) {
+  var tokens = line.split(/\s+/);
+  if (tokens.length < 2) return null;
+
+  var confirmNo = null;
+  var confirmIdx = -1;
+
+  /* Find the confirm number token: 6-14 alphanumeric, must contain at least one digit */
+  for (var i = 0; i < tokens.length; i++) {
+    var tok = tokens[i].replace(/^[:\-\.=\|]+|[:\-\.=\|]+$/g, ''); /* strip separators */
+    if (tok.length >= 6 && tok.length <= 14 && /^[A-Za-z0-9]+$/.test(tok) && /\d/.test(tok)) {
+      confirmNo = tok;
+      confirmIdx = i;
+      break;
+    }
+  }
+
+  if (!confirmNo) return null;
+
+  /* Everything else is the name */
+  var nameParts = [];
+  for (var j = 0; j < tokens.length; j++) {
+    if (j === confirmIdx) continue;
+    var t = tokens[j].replace(/^[:\-\.=\|]+|[:\-\.=\|]+$/g, '');
+    if (t) nameParts.push(t);
+  }
+
+  var name = nameParts.join(' ').trim();
+  if (!name) return null;
+
+  /* Extract clean name (letters/spaces/hyphens or Chinese chars) */
+  var nameMatch = name.match(/([A-Za-z\u4e00-\u9fa5][A-Za-z\s,\-]*[A-Za-z\u4e00-\u9fa5])/);
+  if (nameMatch) {
+    name = nameMatch[1].trim();
+  }
+
+  if (name.length < 2) return null;
+
+  return { confirmNo: confirmNo, name: name };
 }
 
 /**
