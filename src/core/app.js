@@ -67,15 +67,23 @@ var App = (function () {
   }
 
   function setupEventListeners() {
+    /* Page changed -> render */
+    Events.on(EVENTS.PAGE_CHANGED, function (data) {
+      _renderPage(data.page);
+    });
+
+    /* UI render request -> render current page */
+    Events.on(EVENTS.UI_RENDER, function (data) {
+      _renderPage(data.page || Router.getCurrentPage());
+    });
+
     /* Re-render current page when data changes */
     Events.on(EVENTS.BOOKINGS_LOADED, function () {
-      var page = Router.getCurrentPage();
-      Events.emit(EVENTS.UI_RENDER, { page: page });
+      Events.emit(EVENTS.UI_RENDER, { page: Router.getCurrentPage() });
     });
 
     Events.on(EVENTS.BOOKINGS_SYNCED, function () {
-      var page = Router.getCurrentPage();
-      Events.emit(EVENTS.UI_RENDER, { page: page });
+      Events.emit(EVENTS.UI_RENDER, { page: Router.getCurrentPage() });
     });
 
     /* Sync status updates */
@@ -112,6 +120,25 @@ var App = (function () {
     /* Update version label */
     var verEl = document.querySelector('.version-label');
     if (verEl) verEl.textContent = 'v' + APP.VERSION;
+  }
+
+  /* Render a page by ID */
+  function _renderPage(pageId) {
+    var map = {
+      overview: 'renderOverview',
+      profit: 'renderProfit',
+      fees: 'renderFees',
+      agentPerformance: 'renderAgentPerformance',
+      archives: 'renderArchives',
+      employees: 'renderEmployees',
+      hotelConfig: 'renderHotelConfig'
+    };
+    var fn = map[pageId];
+    if (fn && typeof window[fn] === 'function') {
+      window[fn]();
+    } else {
+      console.warn('[App] No render function for page:', pageId);
+    }
   }
 
   function updateSyncIndicator(connected) {
