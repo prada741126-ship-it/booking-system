@@ -147,20 +147,20 @@ function build() {
   jsContent += '  if (pwdInput) pwdInput.focus();\n';
   jsContent += '});\n';
 
-  /* Auto version check: fetch latest HTML (bypass cache), compare BUILD_VERSION, auto-reload if newer */
+  /* Auto version check: fetch latest app.html (bypass cache), compare BUILD_VERSION, auto-reload if newer */
   jsContent += '/* Auto version check — bypass CDN cache */\n';
   jsContent += '(function(){\n';
   jsContent += '  if (sessionStorage.getItem("_vc")) return;\n';
   jsContent += '  sessionStorage.setItem("_vc","1");\n';
   jsContent += '  setTimeout(function(){\n';
   jsContent += '    try {\n';
-  jsContent += '      fetch(window.location.href.split("?")[0].replace(/#.*$/,"") + "index.html", {cache:"no-store"})\n';
+  jsContent += '      fetch("app.html", {cache:"no-store"})\n';
   jsContent += '        .then(function(r){return r.text();})\n';
   jsContent += '        .then(function(html){\n';
   jsContent += '          var m = html.match(/BUILD_VERSION\\s*=\\s*["\']([0-9]+)["\']/);\n';
   jsContent += '          if (m && m[1] !== String(window.BUILD_VERSION)) {\n';
   jsContent += '            console.log("[Cache] New version detected: " + m[1] + " vs current " + window.BUILD_VERSION + ". Reloading...");\n';
-  jsContent += '            window.location.reload();\n';
+  jsContent += '            window.location.replace("app.html?v=" + Date.now());\n';
   jsContent += '          }\n';
   jsContent += '        })\n';
   jsContent += '        .catch(function(e){console.log("[Cache] version check failed:",e.message);});\n';
@@ -173,11 +173,35 @@ function build() {
   html = html.split('<!-- {{JS}} -->').join(jsContent);
 
   /* 4. Write to dist */
-  console.log('[4/5] Writing dist/index.html...');
+  console.log('[4/5] Writing dist/app.html + dist/index.html (cache-bust entry)...');
   ensureDir(DIST_DIR);
-  var outputPath = path.join(DIST_DIR, 'index.html');
-  fs.writeFileSync(outputPath, html, 'utf8');
-  console.log('       Output: ' + outputPath + ' (' + html.length + ' bytes)');
+
+  /* Write the real app as app.html */
+  var appPath = path.join(DIST_DIR, 'app.html');
+  fs.writeFileSync(appPath, html, 'utf8');
+  console.log('       Output: ' + appPath + ' (' + html.length + ' bytes)');
+
+  /* Write a tiny redirect entry as index.html — this file NEVER changes,
+     so browsers cache it, but it redirects to app.html?v=<timestamp> which
+     is a fresh URL every time, bypassing all cache. */
+  var entryHtml = '<!DOCTYPE html>\n'
+    + '<html>\n<head>\n'
+    + '<meta charset="UTF-8">\n'
+    + '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+    + '<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">\n'
+    + '<meta http-equiv="Pragma" content="no-cache">\n'
+    + '<meta http-equiv="Expires" content="0">\n'
+    + '<title>BookingHub — 訂房管理系統</title>\n'
+    + '<style>body{margin:0;background:#f0f2f5;color:#1e293b;font-family:-apple-system,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh}.l{font-size:18px}.l a{color:#0095ff}</style>\n'
+    + '</head>\n<body>\n'
+    + '<div class="l">Loading BookingHub... <a href="app.html">Click here</a></div>\n'
+    + '<script>\n'
+    + 'window.location.replace("app.html?v=" + Date.now());\n'
+    + '</script>\n'
+    + '</body>\n</html>\n';
+  var entryPath = path.join(DIST_DIR, 'index.html');
+  fs.writeFileSync(entryPath, entryHtml, 'utf8');
+  console.log('       Output: ' + entryPath + ' (' + entryHtml.length + ' bytes)');
 
   /* 5. Run tests */
   console.log('[5/5] Running tests...');
@@ -191,8 +215,8 @@ function build() {
   console.log('');
   console.log('========================================');
   console.log('  BUILD SUCCESS');
-  console.log('  Output: dist/index.html');
-  console.log('  Size: ' + (html.length / 1024).toFixed(1) + ' KB');
+  console.log('  Output: dist/app.html + dist/index.html (entry)');
+  console.log('  App size: ' + (html.length / 1024).toFixed(1) + ' KB');
   console.log('  Tests: ' + testResult.passed + '/' + testResult.total + ' PASS');
   console.log('========================================');
   console.log('');
@@ -796,9 +820,9 @@ function runTests() {
   });
 
   /* ===== Test: Build output was created ===== */
-  test('dist/index.html was created', function () {
-    var distPath = path.join(DIST_DIR, 'index.html');
-    assert(fs.existsSync(distPath), 'dist/index.html not found');
+  test('dist/app.html was created', function () {
+    var distPath = path.join(DIST_DIR, 'app.html');
+    assert(fs.existsSync(distPath), 'dist/app.html not found');
     var dist = readFile(distPath);
     assert(dist.indexOf('<style>') !== -1, 'Missing inlined CSS');
     assert(dist.indexOf('<script>') !== -1, 'Missing inlined JS');
@@ -806,8 +830,16 @@ function runTests() {
     assert(dist.indexOf('{{JS}}') === -1, 'JS placeholder not replaced');
   });
 
-  test('dist/index.html has all 7 page containers', function () {
-    var dist = readFile(path.join(DIST_DIR, 'index.html'));
+  test('dist/index.html is a redirect entry', function () {
+    var entryPath = path.join(DIST_DIR, 'index.html');
+    assert(fs.existsSync(entryPath), 'dist/index.html not found');
+    var entry = readFile(entryPath);
+    assert(entry.indexOf('app.html') !== -1, 'index.html should redirect to app.html');
+    assert(entry.indexOf('no-cache') !== -1, 'index.html should have no-cache meta');
+  });
+
+  test('dist/app.html has all 7 page containers', function () {
+    var dist = readFile(path.join(DIST_DIR, 'app.html'));
     assert(dist.indexOf('id="page-overview"') !== -1, 'Missing #page-overview in dist');
     assert(dist.indexOf('id="page-profit"') !== -1, 'Missing #page-profit in dist');
     assert(dist.indexOf('id="page-fees"') !== -1, 'Missing #page-fees in dist');
