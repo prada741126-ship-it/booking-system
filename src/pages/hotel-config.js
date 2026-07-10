@@ -124,11 +124,14 @@ var HotelConfigPage = (function () {
     html += '    <span style="font-weight:600;">' + Utils.escapeHtml(hotel.name) + '</span>';
     html += '  </div>';
     html += '  <div class="hc-room-grid">';
+    var rc = hotel.roomConfig || {};
     for (var ri = 0; ri < ROOM_TYPES.length; ri++) {
       var rt = ROOM_TYPES[ri];
-      var config = (hotel.roomConfig && hotel.roomConfig[rt.value]) || { threshold: 0, defaultPrice: 0 };
+      if (!rc.hasOwnProperty(rt.value)) continue;
+      var config = rc[rt.value] || { threshold: 0, defaultPrice: 0 };
       html += _roomCell(casinoName, hotel.name, rt, config);
     }
+    html += _addRoomCell(casinoName, hotel.name);
     html += '  </div>';
     html += '  <div class="hc-hotel-actions">';
     html += '    <button class="btn btn-ghost btn-sm" onclick="HotelConfigPage.renameHotel(\'' + Utils.escapeHtml(casinoName) + '\',\'' + Utils.escapeHtml(hotel.name) + '\')">改名</button>';
@@ -139,12 +142,22 @@ var HotelConfigPage = (function () {
   }
 
   function _roomCell(casinoName, hotelName, roomType, config) {
-    var html = '<div class="hc-room-cell">';
+    var html = '<div class="hc-room-cell" style="position:relative;">';
+    html += '  <button class="hc-room-del" onclick="event.stopPropagation();HotelConfigPage.removeRoomType(\'' + Utils.escapeHtml(casinoName) + '\',\'' + Utils.escapeHtml(hotelName) + '\',\'' + roomType.value + '\')" title="刪除此房型" style="position:absolute;top:2px;right:4px;border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:14px;line-height:1;padding:2px 4px;border-radius:3px;">&times;</button>';
     html += '  <div class="hc-room-label">' + Utils.escapeHtml(roomType.short) + '</div>';
     html += '  <div class="hc-room-threshold" onclick="HotelConfigPage.editThreshold(\'' + Utils.escapeHtml(casinoName) + '\',\'' + Utils.escapeHtml(hotelName) + '\',\'' + roomType.value + '\')" title="點擊編輯門檻">';
     html += '    <span style="font-size:var(--fs-xs);color:var(--text-muted);">門檻(萬)</span>';
     html += '    <span style="font-weight:600;color:var(--color-primary);">' + Utils.formatNumber(Math.round((config.threshold || 0) / 10000)) + '</span>';
     html += '  </div>';
+    html += '</div>';
+    return html;
+  }
+
+  function _addRoomCell(casinoName, hotelName) {
+    var available = Hotels.getAvailableRoomTypes(casinoName, hotelName);
+    if (available.length === 0) return '';
+    var html = '<div class="hc-room-cell" style="border:1px dashed var(--border-default);display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:60px;" onclick="HotelConfigPage.showAddRoomType(\'' + Utils.escapeHtml(casinoName) + '\',\'' + Utils.escapeHtml(hotelName) + '\')" title="新增房型">';
+    html += '  <span style="font-size:24px;color:var(--text-muted);font-weight:300;">+</span>';
     html += '</div>';
     return html;
   }
@@ -291,6 +304,55 @@ var HotelConfigPage = (function () {
     render();
   }
 
+  /* ===== Room Type Delete / Add ===== */
+
+  function removeRoomType(casinoName, hotelName, roomType) {
+    var rtLabel = '';
+    for (var i = 0; i < ROOM_TYPES.length; i++) {
+      if (ROOM_TYPES[i].value === roomType) { rtLabel = ROOM_TYPES[i].label; break; }
+    }
+    Modal.confirm('確認刪除「' + hotelName + '」的「' + rtLabel + '」房型？\n此房型將不再出現在訂房選項中。', function () {
+      Hotels.removeRoomType(casinoName, hotelName, roomType);
+      Toast.success('已刪除房型: ' + rtLabel);
+      render();
+    }, { confirmText: '確認刪除', title: '刪除房型' });
+  }
+
+  function showAddRoomType(casinoName, hotelName) {
+    var available = Hotels.getAvailableRoomTypes(casinoName, hotelName);
+    if (available.length === 0) {
+      Toast.info('此酒店已包含所有房型');
+      return;
+    }
+
+    var body = '<div class="form-group"><label>選擇房型</label>' +
+      '<select class="form-control" id="hc-add-roomtype">';
+    for (var i = 0; i < available.length; i++) {
+      body += '<option value="' + available[i].value + '">' + Utils.escapeHtml(available[i].label) + '</option>';
+    }
+    body += '</select></div>';
+    body += '<div class="form-group"><label>洗碼門檻（萬）</label>' +
+      '<input type="number" id="hc-add-threshold" value="30" placeholder="0"></div>' +
+      '<p style="font-size:var(--fs-xs);color:var(--text-muted);">以萬為單位輸入，例如 30 = 30萬</p>';
+
+    Modal.open({
+      title: '新增房型 — ' + hotelName,
+      body: body,
+      footer: '<button class="btn btn-secondary" data-modal-close>取消</button><button class="btn btn-primary" onclick="HotelConfigPage.confirmAddRoomType(\'' + Utils.escapeHtml(casinoName) + '\',\'' + Utils.escapeHtml(hotelName) + '\')">確認</button>'
+    });
+  }
+
+  function confirmAddRoomType(casinoName, hotelName) {
+    var roomType = document.getElementById('hc-add-roomtype').value;
+    var thresholdWan = Number(document.getElementById('hc-add-threshold').value) || 0;
+    var threshold = thresholdWan * 10000;
+
+    Hotels.addRoomType(casinoName, hotelName, roomType, threshold);
+    Toast.success('已新增房型');
+    Modal.close();
+    render();
+  }
+
   /* ===== Reset ===== */
 
   function confirmReset() {
@@ -336,6 +398,9 @@ var HotelConfigPage = (function () {
     removeHotel: removeHotel,
     editThreshold: editThreshold,
     confirmEditThreshold: confirmEditThreshold,
+    removeRoomType: removeRoomType,
+    showAddRoomType: showAddRoomType,
+    confirmAddRoomType: confirmAddRoomType,
     confirmReset: confirmReset,
     loadPresets: loadPresets
   };

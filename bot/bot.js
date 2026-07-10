@@ -1283,6 +1283,7 @@ function roomTypeKB(casino, hotel) {
   var rows = [];
   for (var i = 0; i < ROOM_TYPES.length; i++) {
     var rt = ROOM_TYPES[i];
+    if (!rc[rt.value]) continue;
     var threshold = (rc[rt.value] && rc[rt.value].threshold) ? rc[rt.value].threshold : 0;
     var label = rt.label + ' (门槛: ' + formatNum(Math.round(threshold / 10000)) + '万)';
     rows.push([{ text: label, callback_data: 'room:' + rt.value }]);

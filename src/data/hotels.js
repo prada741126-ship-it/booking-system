@@ -458,7 +458,112 @@ var Hotels = {
     return found;
   },
 
-  /* ===== Query Methods ===== */
+  /* ===== Room Type Delete / Add ===== */
+
+  removeRoomType: function (casinoName, hotelName, roomType) {
+    if (!casinoName || !hotelName || !roomType) return false;
+    var hc = State.get('hotelConfig');
+    if (!hc || !hc.casinos) return false;
+
+    var found = false;
+    for (var i = 0; i < hc.casinos.length; i++) {
+      if (hc.casinos[i].name === casinoName) {
+        for (var j = 0; j < hc.casinos[i].hotels.length; j++) {
+          if (hc.casinos[i].hotels[j].name === hotelName) {
+            var rc = hc.casinos[i].hotels[j].roomConfig || {};
+            if (rc.hasOwnProperty(roomType)) {
+              delete rc[roomType];
+              found = true;
+            }
+            break;
+          }
+        }
+        break;
+      }
+    }
+
+    if (found) {
+      hc._updatedAt = Date.now();
+      State.set('hotelConfig', hc);
+      Store.saveHotelConfig(hc);
+      syncHCToFirebase(hc);
+      Events.emit(EVENTS.HC_UPDATED, { type: 'removeRoomType', casino: casinoName, hotel: hotelName, roomType: roomType });
+    }
+    return found;
+  },
+
+  addRoomType: function (casinoName, hotelName, roomType, threshold) {
+    if (!casinoName || !hotelName || !roomType) return false;
+    var hc = State.get('hotelConfig');
+    if (!hc || !hc.casinos) return false;
+
+    var found = false;
+    for (var i = 0; i < hc.casinos.length; i++) {
+      if (hc.casinos[i].name === casinoName) {
+        for (var j = 0; j < hc.casinos[i].hotels.length; j++) {
+          if (hc.casinos[i].hotels[j].name === hotelName) {
+            if (!hc.casinos[i].hotels[j].roomConfig) {
+              hc.casinos[i].hotels[j].roomConfig = {};
+            }
+            hc.casinos[i].hotels[j].roomConfig[roomType] = {
+              threshold: Number(threshold) || 0,
+              defaultPrice: 0
+            };
+            found = true;
+            break;
+          }
+        }
+        break;
+      }
+    }
+
+    if (found) {
+      hc._updatedAt = Date.now();
+      State.set('hotelConfig', hc);
+      Store.saveHotelConfig(hc);
+      syncHCToFirebase(hc);
+      Events.emit(EVENTS.HC_UPDATED, { type: 'addRoomType', casino: casinoName, hotel: hotelName, roomType: roomType });
+    }
+    return found;
+  },
+
+  hasRoomType: function (casinoName, hotelName, roomType) {
+    var hc = State.get('hotelConfig');
+    if (!hc || !hc.casinos) return false;
+    for (var i = 0; i < hc.casinos.length; i++) {
+      if (hc.casinos[i].name === casinoName) {
+        for (var j = 0; j < hc.casinos[i].hotels.length; j++) {
+          if (hc.casinos[i].hotels[j].name === hotelName) {
+            var rc = hc.casinos[i].hotels[j].roomConfig || {};
+            return rc.hasOwnProperty(roomType);
+          }
+        }
+      }
+    }
+    return false;
+  },
+
+  getAvailableRoomTypes: function (casinoName, hotelName) {
+    var hc = State.get('hotelConfig');
+    if (!hc || !hc.casinos) return [];
+    for (var i = 0; i < hc.casinos.length; i++) {
+      if (hc.casinos[i].name === casinoName) {
+        for (var j = 0; j < hc.casinos[i].hotels.length; j++) {
+          if (hc.casinos[i].hotels[j].name === hotelName) {
+            var rc = hc.casinos[i].hotels[j].roomConfig || {};
+            var available = [];
+            for (var k = 0; k < ROOM_TYPES.length; k++) {
+              if (!rc.hasOwnProperty(ROOM_TYPES[k].value)) {
+                available.push(ROOM_TYPES[k]);
+              }
+            }
+            return available;
+          }
+        }
+      }
+    }
+    return [];
+  },
 
   getCasinos: function () {
     var hc = State.get('hotelConfig');

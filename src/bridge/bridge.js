@@ -166,6 +166,7 @@ function onHotelChange() {
 
   roomSelect.innerHTML = '<option value="">\u8acb\u9078\u64c7</option>';
   for (var i = 0; i < ROOM_TYPES.length; i++) {
+    if (!Hotels.hasRoomType(casino, hotel, ROOM_TYPES[i].value)) continue;
     var threshold = Hotels.getThreshold(casino, hotel, ROOM_TYPES[i].value);
     roomSelect.innerHTML += '<option value="' + ROOM_TYPES[i].value + '" data-threshold="' + threshold + '">' +
       Utils.escapeHtml(ROOM_TYPES[i].label) + ' (\u9580\u6abbi ' + Utils.formatNumber(Math.round(threshold / 10000)) + '\u842c)</option>';
