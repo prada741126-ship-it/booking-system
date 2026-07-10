@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-  <meta name="theme-color" content="#0a0a0f">
+  <meta name="theme-color" content="#f0f2f5">
   <meta name="description" content="VIP 貴賓廳訂房管理系統 — 同步、高效、即時">
   <title>BookingHub — VIP 訂房管理系統</title>
   <!-- CSS will be injected here by build.js -->
@@ -29,7 +29,7 @@
     </div>
     <div class="login-error" id="login-error"></div>
     <button class="login-btn" onclick="handleLogin({key:'Enter'})">登 入</button>
-    <div class="login-hint">預設密碼：admin123（首次登入後請修改）</div>
+    <div class="login-hint">會計與管理層共用密碼登入</div>
   </div>
 </div>
 
@@ -54,31 +54,43 @@
         <span class="nav-label">總覽</span>
         <span class="nav-shortcut">1</span>
       </div>
-      <div class="nav-item" data-page="calendar" onclick="navigateTo('calendar')">
-        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg></div>
-        <span class="nav-label">日曆</span>
+      <div class="nav-item" data-page="profit" onclick="navigateTo('profit')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg></div>
+        <span class="nav-label">利潤結算</span>
         <span class="nav-shortcut">2</span>
       </div>
-      <div class="nav-item" data-page="booking-list" onclick="navigateTo('booking-list')">
-        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"/></svg></div>
-        <span class="nav-label">訂房列表</span>
+      <div class="nav-item" data-page="fees" onclick="navigateTo('fees')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg></div>
+        <span class="nav-label">費用收取</span>
         <span class="nav-shortcut">3</span>
       </div>
-      <div class="nav-item" data-page="stats" onclick="navigateTo('stats')">
-        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/></svg></div>
-        <span class="nav-label">統計</span>
+      <div class="nav-item" data-page="agent-performance" onclick="navigateTo('agent-performance')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+        <span class="nav-label">代理業績</span>
         <span class="nav-shortcut">4</span>
       </div>
-      <div class="nav-item" data-page="bot-log" onclick="navigateTo('bot-log')">
-        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.72v1.32l4 2v2l-4 2v2.24A4 4 0 0 1 12 22a4 4 0 0 1-1-7.76V4a2 2 0 0 1 1-2z"/></svg></div>
-        <span class="nav-label">Bot日誌</span>
+      <div class="nav-item" data-page="archives" onclick="navigateTo('archives')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg></div>
+        <span class="nav-label">歷史核帳</span>
         <span class="nav-shortcut">5</span>
+      </div>
+
+      <div class="sidebar-section-label" style="margin-top:var(--sp-4);">管理</div>
+      <div class="nav-item" data-page="employees" onclick="navigateTo('employees')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
+        <span class="nav-label">員工管理</span>
+        <span class="nav-shortcut">6</span>
+      </div>
+      <div class="nav-item" data-page="hotel-config" onclick="navigateTo('hotel-config')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-1.1-.9-2-2-2z"/></svg></div>
+        <span class="nav-label">酒店設定</span>
+        <span class="nav-shortcut">7</span>
       </div>
 
       <div class="sidebar-section-label" style="margin-top:var(--sp-4);">工具</div>
       <div class="nav-item" onclick="openAgentModal()">
         <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
-        <span class="nav-label">代理管理</span>
+        <span class="nav-label">代理名單</span>
       </div>
       <div class="nav-item" onclick="openBackupModal()">
         <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z"/></svg></div>
@@ -102,9 +114,9 @@
       <div class="sync-status-pill">
         <div class="sync-dot disconnected" id="sync-dot"></div>
         <span id="sync-status-text">未連線</span>
-        <span style="margin-left:auto;" id="last-sync-time">—</span>
+        <span style="margin-left:auto;" id="last-sync-time">--</span>
       </div>
-      <div class="version-label">v1.0.0</div>
+      <div class="version-label">v2.0.0</div>
     </div>
   </aside>
 
@@ -128,7 +140,7 @@
           <button onclick="prevMonth()" title="上月">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
           </button>
-          <span class="month-display" id="month-display">—</span>
+          <span class="month-display" id="month-display">--</span>
           <button onclick="nextMonth()" title="下月">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
           </button>
@@ -142,12 +154,14 @@
       </div>
     </div>
 
-    <!-- ===== Pages ===== -->
+    <!-- ===== Pages (v8: 7 pages) ===== -->
     <div class="page-content active" id="page-overview"></div>
-    <div class="page-content" id="page-calendar"></div>
-    <div class="page-content" id="page-booking-list"></div>
-    <div class="page-content" id="page-stats"></div>
-    <div class="page-content" id="page-bot-log"></div>
+    <div class="page-content" id="page-profit"></div>
+    <div class="page-content" id="page-fees"></div>
+    <div class="page-content" id="page-agent-performance"></div>
+    <div class="page-content" id="page-archives"></div>
+    <div class="page-content" id="page-employees"></div>
+    <div class="page-content" id="page-hotel-config"></div>
 
   </div>
 </div>
@@ -159,21 +173,21 @@
       <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
       <span class="bottom-nav-label">總覽</span>
     </div>
-    <div class="bottom-nav-item" data-page="calendar" onclick="navigateTo('calendar')">
-      <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></svg>
-      <span class="bottom-nav-label">日曆</span>
+    <div class="bottom-nav-item" data-page="profit" onclick="navigateTo('profit')">
+      <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+      <span class="bottom-nav-label">利潤</span>
     </div>
-    <div class="bottom-nav-item" data-page="booking-list" onclick="navigateTo('booking-list')">
-      <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"/></svg>
-      <span class="bottom-nav-label">列表</span>
+    <div class="bottom-nav-item" data-page="fees" onclick="navigateTo('fees')">
+      <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
+      <span class="bottom-nav-label">費用</span>
     </div>
-    <div class="bottom-nav-item" data-page="stats" onclick="navigateTo('stats')">
-      <svg viewBox="0 0 24 24"><path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/></svg>
-      <span class="bottom-nav-label">統計</span>
+    <div class="bottom-nav-item" data-page="archives" onclick="navigateTo('archives')">
+      <svg viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
+      <span class="bottom-nav-label">歸檔</span>
     </div>
-    <div class="bottom-nav-item" data-page="bot-log" onclick="navigateTo('bot-log')">
-      <svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.72v1.32l4 2v2l-4 2v2.24A4 4 0 0 1 12 22a4 4 0 0 1-1-7.76V4a2 2 0 0 1 1-2z"/></svg>
-      <span class="bottom-nav-label">Bot</span>
+    <div class="bottom-nav-item" data-page="employees" onclick="navigateTo('employees')">
+      <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+      <span class="bottom-nav-label">員工</span>
     </div>
   </div>
 </nav>

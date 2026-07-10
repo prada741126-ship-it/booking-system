@@ -1,6 +1,5 @@
 /**
  * recently-deleted.js — Track recently deleted items for anti-resurrection
- * Pattern: faithfully reused from v13.0.5
  * Prevents deleted items from being "resurrected" by sync download
  */
 var RecentlyDeleted = (function () {
@@ -21,8 +20,6 @@ var RecentlyDeleted = (function () {
       fbKey: fbKey,
       deletedAt: Date.now()
     });
-
-    // Trim to limit
     if (_list.length > CONFIG.RECENTLY_DELETED_LIMIT) {
       _list = _list.slice(-CONFIG.RECENTLY_DELETED_LIMIT);
     }

@@ -1,233 +1,238 @@
 /**
- * store.js — localStorage Persistence Layer
+ * store.js — localStorage persistence layer
+ * Encrypts sensitive data, stores all collections
  * Pattern: faithfully reused from v13.0.5
- * Features: AES encryption, save/load per-key, saveAll/loadAll, clearLocalData
  */
 var Store = (function () {
-  var _isAvailable = false;
-
-  function _checkAvailable() {
-    try {
-      var test = '__test__';
-      localStorage.setItem(test, test);
-      localStorage.removeItem(test);
-      _isAvailable = true;
-    } catch (e) {
-      _isAvailable = false;
-      console.warn('[Store] localStorage not available:', e.message);
-    }
-    return _isAvailable;
-  }
 
   function _encrypt(data) {
     try {
-      if (typeof CryptoJS === 'undefined') return JSON.stringify(data);
-      return CryptoJS.AES.encrypt(JSON.stringify(data), 'booking-system-v1').toString();
+      var json = JSON.stringify(data);
+      if (typeof CryptoJS !== 'undefined') {
+        return CryptoJS.AES.encrypt(json, 'bookinghub_v2').toString();
+      }
+      return json;
     } catch (e) {
-      console.error('[Store] Encrypt failed:', e);
+      console.error('[Store] Encrypt error:', e);
       return JSON.stringify(data);
     }
   }
 
-  function _decrypt(str) {
+  function _decrypt(raw) {
+    if (raw === null || raw === undefined || raw === '') return null;
     try {
-      // Try JSON first (fallback mode)
-      if (str.charAt(0) === '{' || str.charAt(0) === '[') {
-        return JSON.parse(str);
+      if (typeof CryptoJS !== 'undefined' && raw.charAt(0) === 'U') {
+        var bytes = CryptoJS.AES.decrypt(raw, 'bookinghub_v2');
+        var json = bytes.toString(CryptoJS.enc.Utf8);
+        if (json) return JSON.parse(json);
       }
-      if (typeof CryptoJS === 'undefined') return JSON.parse(str);
-      var bytes = CryptoJS.AES.decrypt(str, 'booking-system-v1');
-      var decrypted = bytes.toString(CryptoJS.enc.Utf8);
-      return JSON.parse(decrypted);
+      return JSON.parse(raw);
     } catch (e) {
-      console.error('[Store] Decrypt failed:', e);
-      return null;
+      console.error('[Store] Decrypt error:', e);
+      try { return JSON.parse(raw); } catch (e2) { return null; }
     }
   }
 
-  function save(key, data, encrypt) {
-    if (!_isAvailable) _checkAvailable();
-    if (!_isAvailable) return false;
+  function save(key, data) {
     try {
-      var str = encrypt ? _encrypt(data) : JSON.stringify(data);
-      localStorage.setItem(key, str);
+      var raw = _encrypt(data);
+      localStorage.setItem(key, raw);
       return true;
     } catch (e) {
-      console.error('[Store] Save failed for key "' + key + '":', e);
+      console.error('[Store] Save error for key "' + key + '":', e);
       return false;
     }
   }
 
-  function load(key, decrypt) {
-    if (!_isAvailable) _checkAvailable();
-    if (!_isAvailable) return null;
+  function load(key) {
     try {
-      var str = localStorage.getItem(key);
-      if (str === null) return null;
-      return decrypt ? _decrypt(str) : JSON.parse(str);
+      var raw = localStorage.getItem(key);
+      return _decrypt(raw);
     } catch (e) {
-      console.error('[Store] Load failed for key "' + key + '":', e);
+      console.error('[Store] Load error for key "' + key + '":', e);
       return null;
     }
   }
 
   function remove(key) {
-    if (!_isAvailable) _checkAvailable();
-    if (!_isAvailable) return;
     try {
       localStorage.removeItem(key);
     } catch (e) {
-      console.error('[Store] Remove failed for key "' + key + '":', e);
+      console.error('[Store] Remove error for key "' + key + '":', e);
     }
   }
 
-  /* ===== Booking-specific methods ===== */
+  /* ===== Collection-specific helpers ===== */
+
   function saveBookings(bookings) {
-    return save(STORAGE_KEYS.BOOKINGS, bookings, true);
+    return save(STORAGE_KEYS.BOOKINGS, bookings);
   }
 
   function loadBookings() {
-    return load(STORAGE_KEYS.BOOKINGS, true) || [];
+    return load(STORAGE_KEYS.BOOKINGS) || [];
   }
 
   function saveHotelConfig(config) {
-    return save(STORAGE_KEYS.HOTEL_CONFIG, config, true);
+    return save(STORAGE_KEYS.HOTEL_CONFIG, config);
   }
 
   function loadHotelConfig() {
-    return load(STORAGE_KEYS.HOTEL_CONFIG, true) || [];
+    return load(STORAGE_KEYS.HOTEL_CONFIG);
   }
 
   function saveAgentList(list) {
-    return save(STORAGE_KEYS.AGENT_LIST, list, true);
+    return save(STORAGE_KEYS.AGENT_LIST, list);
   }
 
   function loadAgentList() {
-    return load(STORAGE_KEYS.AGENT_LIST, true) || [];
+    return load(STORAGE_KEYS.AGENT_LIST) || [];
   }
 
-  function saveBotLogs(logs) {
-    return save(STORAGE_KEYS.BOT_LOGS, logs, true);
+  function saveEmployeeList(list) {
+    return save(STORAGE_KEYS.EMPLOYEE_LIST, list);
   }
 
-  function loadBotLogs() {
-    return load(STORAGE_KEYS.BOT_LOGS, true) || [];
+  function loadEmployeeList() {
+    return load(STORAGE_KEYS.EMPLOYEE_LIST) || [];
   }
 
-  function saveWorkingMonth(month) {
-    return save(STORAGE_KEYS.WORKING_MONTH, month, false);
+  function saveArchives(archives) {
+    return save(STORAGE_KEYS.ARCHIVES, archives);
   }
 
-  function loadWorkingMonth() {
-    return load(STORAGE_KEYS.WORKING_MONTH, false);
+  function loadArchives() {
+    return load(STORAGE_KEYS.ARCHIVES) || [];
+  }
+
+  function saveClosedMonths(months) {
+    return save(STORAGE_KEYS.CLOSED_MONTHS, months);
+  }
+
+  function loadClosedMonths() {
+    return load(STORAGE_KEYS.CLOSED_MONTHS) || [];
+  }
+
+  function saveSettings(settings) {
+    return save(STORAGE_KEYS.SETTINGS, settings);
+  }
+
+  function loadSettings() {
+    return load(STORAGE_KEYS.SETTINGS) || {};
   }
 
   function saveAuth(auth) {
-    return save(STORAGE_KEYS.AUTH, auth, true);
+    return save(STORAGE_KEYS.AUTH, auth);
   }
 
   function loadAuth() {
-    return load(STORAGE_KEYS.AUTH, true);
+    return load(STORAGE_KEYS.AUTH);
   }
 
-  function saveRecentlyDeleted(data) {
-    return save(STORAGE_KEYS.RECENTLY_DELETED, data, true);
+  function saveWorkingMonth(month) {
+    return save(STORAGE_KEYS.WORKING_MONTH, month);
+  }
+
+  function loadWorkingMonth() {
+    return load(STORAGE_KEYS.WORKING_MONTH);
+  }
+
+  function saveDraft(draft) {
+    return save(STORAGE_KEYS.DRAFT, draft);
+  }
+
+  function loadDraft() {
+    return load(STORAGE_KEYS.DRAFT);
+  }
+
+  function clearDraft() {
+    remove(STORAGE_KEYS.DRAFT);
+  }
+
+  function saveRecentlyDeleted(list) {
+    return save(STORAGE_KEYS.RECENTLY_DELETED, list);
   }
 
   function loadRecentlyDeleted() {
-    return load(STORAGE_KEYS.RECENTLY_DELETED, true) || [];
+    return load(STORAGE_KEYS.RECENTLY_DELETED) || [];
   }
 
-  /* ===== Batch operations ===== */
-  function saveAll() {
-    saveBookings(State.get('bookings'));
-    saveHotelConfig(State.get('hotelConfig'));
-    saveAgentList(State.get('agentList'));
-    saveBotLogs(State.get('botLogs'));
-    var month = State.get('workingMonth');
-    if (month) saveWorkingMonth(month);
-    save(STORAGE_KEYS.APP_VERSION, APP.VERSION, false);
+  function saveBotLogs(logs) {
+    return save(STORAGE_KEYS.BOT_LOGS, logs);
   }
 
+  function loadBotLogs() {
+    return load(STORAGE_KEYS.BOT_LOGS) || [];
+  }
+
+  /* ===== Load all at once ===== */
   function loadAll() {
-    var bookings = loadBookings();
-    var hotelConfig = loadHotelConfig();
-    var agentList = loadAgentList();
-    var botLogs = loadBotLogs();
-    var workingMonth = loadWorkingMonth();
-
-    State.batchSet([
-      { key: 'bookings',    value: bookings    },
-      { key: 'hotelConfig', value: hotelConfig },
-      { key: 'agentList',   value: agentList   },
-      { key: 'botLogs',     value: botLogs     },
-      { key: 'workingMonth',value: workingMonth }
-    ]);
-
     return {
-      bookings: bookings.length,
-      hotelConfig: hotelConfig.length,
-      agentList: agentList.length,
-      botLogs: botLogs.length,
-      workingMonth: workingMonth
+      bookings: loadBookings(),
+      hotelConfig: loadHotelConfig(),
+      agentList: loadAgentList(),
+      employeeList: loadEmployeeList(),
+      archives: loadArchives(),
+      closedMonths: loadClosedMonths(),
+      settings: loadSettings(),
+      auth: loadAuth(),
+      workingMonth: loadWorkingMonth(),
+      draft: loadDraft()
     };
   }
 
-  function clearLocalData() {
-    if (!_isAvailable) _checkAvailable();
-    if (!_isAvailable) return;
-    // Preserve AGENT_LIST (same pattern as v13.0.5)
+  /* ===== Clear all (except agent list per v13 pattern) ===== */
+  function clearAll(keepAgentList) {
     var keysToClear = [
       STORAGE_KEYS.BOOKINGS,
       STORAGE_KEYS.HOTEL_CONFIG,
-      STORAGE_KEYS.DRAFT,
+      STORAGE_KEYS.EMPLOYEE_LIST,
       STORAGE_KEYS.ARCHIVES,
-      STORAGE_KEYS.SAVED_FILTERS,
-      STORAGE_KEYS.BACKUP_LIST,
-      STORAGE_KEYS.WORKING_MONTH,
+      STORAGE_KEYS.DRAFT,
+      STORAGE_KEYS.CLOSED_MONTHS,
+      STORAGE_KEYS.SETTINGS,
       STORAGE_KEYS.RECENTLY_DELETED,
-      STORAGE_KEYS.BOT_LOGS,
-      STORAGE_KEYS.LAST_SYNC_TIME
+      STORAGE_KEYS.WORKING_MONTH,
+      STORAGE_KEYS.BOT_LOGS
     ];
-    // Also clear any backup entries
-    for (var i = 0; i < localStorage.length; i++) {
-      var key = localStorage.key(i);
-      if (key && key.indexOf(STORAGE_KEYS.BACKUP_PREFIX) === 0) {
-        keysToClear.push(key);
-      }
+    if (!keepAgentList) {
+      keysToClear.push(STORAGE_KEYS.AGENT_LIST);
     }
-    for (var j = 0; j < keysToClear.length; j++) {
-      try {
-        localStorage.removeItem(keysToClear[j]);
-      } catch (e) {
-        console.error('[Store] Failed to clear key:', keysToClear[j], e);
-      }
+    for (var i = 0; i < keysToClear.length; i++) {
+      remove(keysToClear[i]);
     }
   }
-
-  _checkAvailable();
 
   return {
     save: save,
     load: load,
     remove: remove,
+    /* Collections */
     saveBookings: saveBookings,
     loadBookings: loadBookings,
     saveHotelConfig: saveHotelConfig,
     loadHotelConfig: loadHotelConfig,
     saveAgentList: saveAgentList,
     loadAgentList: loadAgentList,
-    saveBotLogs: saveBotLogs,
-    loadBotLogs: loadBotLogs,
-    saveWorkingMonth: saveWorkingMonth,
-    loadWorkingMonth: loadWorkingMonth,
+    saveEmployeeList: saveEmployeeList,
+    loadEmployeeList: loadEmployeeList,
+    saveArchives: saveArchives,
+    loadArchives: loadArchives,
+    saveClosedMonths: saveClosedMonths,
+    loadClosedMonths: loadClosedMonths,
+    saveSettings: saveSettings,
+    loadSettings: loadSettings,
     saveAuth: saveAuth,
     loadAuth: loadAuth,
+    saveWorkingMonth: saveWorkingMonth,
+    loadWorkingMonth: loadWorkingMonth,
+    saveDraft: saveDraft,
+    loadDraft: loadDraft,
+    clearDraft: clearDraft,
     saveRecentlyDeleted: saveRecentlyDeleted,
     loadRecentlyDeleted: loadRecentlyDeleted,
-    saveAll: saveAll,
+    saveBotLogs: saveBotLogs,
+    loadBotLogs: loadBotLogs,
     loadAll: loadAll,
-    clearLocalData: clearLocalData,
-    isAvailable: function () { return _isAvailable; }
+    clearAll: clearAll
   };
 })();

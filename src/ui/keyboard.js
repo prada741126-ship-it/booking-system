@@ -1,7 +1,7 @@
 /**
  * keyboard.js — Keyboard Shortcuts Manager
- * Booking System v1.0.0
- * Pattern: reused from v13.0.5
+ * Booking System v2.0.0 (v8 spec)
+ * 7 pages: Ctrl+1~7 | Ctrl+N new | Ctrl+S sync | Ctrl+F search | Ctrl+P print
  */
 var Keyboard = (function () {
   var _initialized = false;
@@ -16,11 +16,10 @@ var Keyboard = (function () {
   }
 
   function _handleKeyDown(e) {
-    // Don't intercept when typing in input/textarea/select
     var tag = e.target.tagName.toLowerCase();
     var isInput = tag === 'input' || tag === 'textarea' || tag === 'select';
 
-    // Ctrl+S and Ctrl+N work even in inputs
+    /* Ctrl/Cmd combos work even in inputs */
     if (e.ctrlKey || e.metaKey) {
       switch (e.key.toLowerCase()) {
         case '1':
@@ -29,19 +28,27 @@ var Keyboard = (function () {
           break;
         case '2':
           e.preventDefault();
-          Router.switchTo(PAGES.CALENDAR);
+          Router.switchTo(PAGES.PROFIT);
           break;
         case '3':
           e.preventDefault();
-          Router.switchTo(PAGES.BOOKING_LIST);
+          Router.switchTo(PAGES.FEES);
           break;
         case '4':
           e.preventDefault();
-          Router.switchTo(PAGES.STATS);
+          Router.switchTo(PAGES.AGENT_PERF);
           break;
         case '5':
           e.preventDefault();
-          Router.switchTo(PAGES.BOT_LOG);
+          Router.switchTo(PAGES.ARCHIVES);
+          break;
+        case '6':
+          e.preventDefault();
+          Router.switchTo(PAGES.EMPLOYEES);
+          break;
+        case '7':
+          e.preventDefault();
+          Router.switchTo(PAGES.HOTEL_CONFIG);
           break;
         case 'n':
           e.preventDefault();
@@ -57,11 +64,15 @@ var Keyboard = (function () {
             _focusSearch();
           }
           break;
+        case 'p':
+          e.preventDefault();
+          window.print();
+          break;
       }
       return;
     }
 
-    // Non-ctrl shortcuts (only when not typing)
+    /* Non-ctrl shortcuts (only when not typing) */
     if (isInput) return;
 
     switch (e.key) {
@@ -86,9 +97,7 @@ var Keyboard = (function () {
   function _triggerSync() {
     if (typeof syncUploadAll === 'function') {
       syncUploadAll(function () {
-        if (typeof showToast === 'function') {
-          showToast('同步完成', 'success');
-        }
+        Toast.success('同步完成');
       });
     }
   }
@@ -121,8 +130,8 @@ var Keyboard = (function () {
 
     var items = SHORTCUTS.map(function (s) {
       return '<div class="shortcut-item">' +
-        '<span class="shortcut-action">' + s.action + '</span>' +
-        '<span class="shortcut-key">' + s.keys + '</span>' +
+        '<span class="shortcut-action">' + Utils.escapeHtml(s.action) + '</span>' +
+        '<span class="shortcut-key">' + Utils.escapeHtml(s.keys) + '</span>' +
         '</div>';
     }).join('');
 
@@ -163,16 +172,15 @@ var Keyboard = (function () {
   }
 
   function _closeAllModals() {
-    // Close help modal
     _closeHelpModal();
 
-    // Close any open modal-overlay
+    /* Close any open modal-overlay */
     var modals = document.querySelectorAll('.modal-overlay.visible');
     for (var i = 0; i < modals.length; i++) {
       modals[i].classList.remove('visible');
     }
 
-    // Close sidebar on mobile
+    /* Close sidebar on mobile */
     var sidebar = document.getElementById('sidebar');
     if (sidebar) sidebar.classList.remove('open');
 

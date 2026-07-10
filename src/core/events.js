@@ -1,73 +1,52 @@
 /**
- * events.js — Event Bus (Pub/Sub)
+ * events.js — Event Bus (pub/sub)
+ * Decouples modules: no direct calls, only events
  * Pattern: faithfully reused from v13.0.5
- * Features: on/off/emit/once, per-handler try-catch, debug, reset
  */
 var Events = (function () {
   var _listeners = {};
-  var _debug = false;
 
-  function on(event, handler) {
+  function on(event, callback) {
     if (!_listeners[event]) {
       _listeners[event] = [];
     }
-    _listeners[event].push(handler);
-    return function unsubscribe() {
-      off(event, handler);
-    };
+    _listeners[event].push(callback);
+    return function () { off(event, callback); };
   }
 
-  function off(event, handler) {
+  function off(event, callback) {
     if (!_listeners[event]) return;
-    var idx = _listeners[event].indexOf(handler);
-    if (idx !== -1) {
-      _listeners[event].splice(idx, 1);
-    }
+    _listeners[event] = _listeners[event].filter(function (fn) {
+      return fn !== callback;
+    });
   }
 
   function emit(event, data) {
-    if (_debug) {
-      console.log('[EventBus] emit:', event, data);
-    }
     if (!_listeners[event]) return;
-    // Clone array to prevent mutation during iteration
-    var handlers = _listeners[event].slice();
-    for (var i = 0; i < handlers.length; i++) {
+    var list = _listeners[event].slice();
+    for (var i = 0; i < list.length; i++) {
       try {
-        handlers[i](data);
-      } catch (err) {
-        console.error('[EventBus] Handler error for "' + event + '":', err);
+        list[i](data || {});
+      } catch (e) {
+        console.error('[Events] Error in listener for "' + event + '":', e);
       }
     }
   }
 
-  function once(event, handler) {
-    var unsub = on(event, function (data) {
-      unsub();
-      handler(data);
-    });
-    return unsub;
+  function once(event, callback) {
+    var wrapper = function (data) {
+      off(event, wrapper);
+      callback(data);
+    };
+    on(event, wrapper);
   }
 
-  function debug(flag) {
-    if (typeof flag === 'boolean') {
-      _debug = flag;
+  function clear(event) {
+    if (event) {
+      delete _listeners[event];
+    } else {
+      _listeners = {};
     }
-    return _debug;
-  }
-
-  function listAll() {
-    var result = {};
-    for (var key in _listeners) {
-      if (_listeners.hasOwnProperty(key)) {
-        result[key] = _listeners[key].length;
-      }
-    }
-    return result;
-  }
-
-  function reset() {
-    _listeners = {};
   }
 
   return {
@@ -75,8 +54,6 @@ var Events = (function () {
     off: off,
     emit: emit,
     once: once,
-    debug: debug,
-    listAll: listAll,
-    reset: reset
+    clear: clear
   };
 })();

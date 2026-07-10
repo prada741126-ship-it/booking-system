@@ -1,141 +1,160 @@
 /**
- * app.js — Main Application Entry Point
- * Pattern: reused from v13.0.5
- * Flow: loadAll → initAuth → initFirebase → startWatchers → renderAll
+ * app.js — Application initialization
+ * v8: Initializes all layers, sets up event listeners
  */
 var App = (function () {
-  var _initialized = false;
 
   function init() {
-    if (_initialized) return;
-    _initialized = true;
+    console.log('[App] Initializing v' + APP.VERSION + '...');
 
-    console.log('[App] Initializing ' + APP.TITLE + ' v' + APP.VERSION);
+    /* 1. Load all data from localStorage */
+    loadFromStore();
 
-    // 1. Load all data from localStorage
-    var stats = Store.loadAll();
-    console.log('[App] Loaded from localStorage:', stats);
-
-    // 2. Initialize auth
-    Auth.init();
-
-    // 3. Set default working month
+    /* 2. Set default working month */
     if (!State.get('workingMonth')) {
-      State.set('workingMonth', Utils.getCurrentMonth());
+      State.set('workingMonth', Utils.currentMonth());
     }
+    Router.updateMonthDisplay();
 
-    // 4. Load hotel config preset if empty
-    if (State.get('hotelConfig').length === 0) {
-      Hotels.resetToPreset();
-    }
+    /* 3. Initialize hotel config with presets if empty */
+    initHotelConfig();
 
-    // 5. Register keyboard shortcuts
+    /* 4. Set up event listeners */
+    setupEventListeners();
+
+    /* 5. Initialize UI components */
     Keyboard.init();
+    Toast.init();
 
-    // 6. Register event listeners
-    _registerEventListeners();
+    /* 6. Navigate to default page */
+    Router.navigateTo('overview');
 
-    // 7. Render initial page
-    _renderAll();
+    /* 7. Initialize Firebase sync */
+    initFirebase(function () {
+      console.log('[App] Firebase ready, starting sync...');
+      App.afterFirebaseReady();
+    });
 
-    // 8. Initialize Firebase sync
-    initFirebase(_onFirebaseReady);
-
-    console.log('[App] Initialization complete');
+    console.log('[App] Initialization complete.');
   }
 
-  function _onFirebaseReady() {
-    console.log('[App] Firebase ready, starting watchers');
-    startWatchers();
-    setTimeout(function () {
-      syncDownloadAll();
-    }, CONFIG.SYNC_RECONNECT_DELAY);
-    setTimeout(function () {
-      syncUploadAll();
-    }, CONFIG.SYNC_UPLOAD_DELAY);
+  function loadFromStore() {
+    var data = Store.loadAll();
+    State.set('bookings', data.bookings || []);
+    State.set('hotelConfig', data.hotelConfig);
+    State.set('agentList', data.agentList || []);
+    State.set('employeeList', data.employeeList || []);
+    State.set('archives', data.archives || []);
+    State.set('closedMonths', data.closedMonths || []);
+    State.set('settings', data.settings || {});
+    if (data.workingMonth) {
+      State.set('workingMonth', data.workingMonth);
+    }
+    console.log('[App] Loaded from store:', {
+      bookings: (data.bookings || []).length,
+      agents: (data.agentList || []).length,
+      employees: (data.employeeList || []).length,
+      archives: (data.archives || []).length
+    });
   }
 
-  function _registerEventListeners() {
-    // Re-render on data changes
+  function initHotelConfig() {
+    var hc = State.get('hotelConfig');
+    if (!hc || !hc.casinos || hc.casinos.length === 0) {
+      console.log('[App] Hotel config empty, loading presets...');
+      Hotels.loadPresets();
+    }
+  }
+
+  function setupEventListeners() {
+    /* Re-render current page when data changes */
     Events.on(EVENTS.BOOKINGS_LOADED, function () {
-      _renderCurrentPage();
+      var page = Router.getCurrentPage();
+      Events.emit(EVENTS.UI_RENDER, { page: page });
     });
-    Events.on(EVENTS.HC_LOADED, function () {
-      _renderCurrentPage();
+
+    Events.on(EVENTS.BOOKINGS_SYNCED, function () {
+      var page = Router.getCurrentPage();
+      Events.emit(EVENTS.UI_RENDER, { page: page });
     });
-    Events.on(EVENTS.AGENT_LIST_UPDATED, function () {
-      _renderCurrentPage();
+
+    /* Sync status updates */
+    Events.on(EVENTS.SYNC_CONNECTED, function () {
+      State.set('syncConnected', true);
+      updateSyncIndicator(true);
     });
-    Events.on(EVENTS.PAGE_CHANGED, function (page) {
-      _renderPage(page);
+
+    Events.on(EVENTS.SYNC_DISCONNECTED, function () {
+      State.set('syncConnected', false);
+      updateSyncIndicator(false);
     });
-    Events.on(EVENTS.SYNC_STATUS, function () {
-      _updateSyncIndicator();
+
+    Events.on(EVENTS.SYNC_DOWNLOAD_DONE, function (data) {
+      State.set('lastSyncTime', Date.now());
+      updateLastSyncTime();
+      Events.emit(EVENTS.UI_TOAST, { type: 'success', message: '同步完成' });
     });
-    Events.on(EVENTS.UI_RENDER, function () {
-      _renderCurrentPage();
+
+    Events.on(EVENTS.SYNC_UPLOAD_DONE, function () {
+      State.set('lastSyncTime', Date.now());
+      updateLastSyncTime();
     });
+
+    Events.on(EVENTS.SYNC_ERROR, function (data) {
+      console.error('[App] Sync error:', data);
+    });
+
+    /* Month changed -> re-render */
+    Events.on(EVENTS.MONTH_CHANGED, function () {
+      Events.emit(EVENTS.UI_RENDER, {});
+    });
+
+    /* Update version label */
+    var verEl = document.querySelector('.version-label');
+    if (verEl) verEl.textContent = 'v' + APP.VERSION;
   }
 
-  function _renderAll() {
-    var page = State.get('currentPage') || PAGES.OVERVIEW;
-    Router.switchTo(page);
-  }
-
-  function _renderCurrentPage() {
-    var page = State.get('currentPage');
-    if (page) _renderPage(page);
-  }
-
-  function _renderPage(page) {
-    try {
-      switch (page) {
-        case PAGES.OVERVIEW:
-          if (typeof renderOverview === 'function') renderOverview();
-          break;
-        case PAGES.CALENDAR:
-          if (typeof renderCalendar === 'function') renderCalendar();
-          break;
-        case PAGES.BOOKING_LIST:
-          if (typeof renderBookingList === 'function') renderBookingList();
-          break;
-        case PAGES.STATS:
-          if (typeof renderStats === 'function') renderStats();
-          break;
-        case PAGES.BOT_LOG:
-          if (typeof renderBotLog === 'function') renderBotLog();
-          break;
-      }
-    } catch (err) {
-      console.error('[App] Render error for page "' + page + '":', err);
+  function updateSyncIndicator(connected) {
+    var dot = document.getElementById('sync-dot');
+    var text = document.getElementById('sync-status-text');
+    if (dot) {
+      dot.className = 'sync-dot ' + (connected ? 'connected' : 'disconnected');
+    }
+    if (text) {
+      text.textContent = connected ? '已連線' : '未連線';
     }
   }
 
-  function _updateSyncIndicator() {
-    var el = document.getElementById('sync-status');
+  function updateLastSyncTime() {
+    var el = document.getElementById('last-sync-time');
     if (!el) return;
-    var connected = State.get('syncConnected');
-    if (connected) {
-      el.className = 'sync-status connected';
-      el.title = '已連線';
-    } else {
-      el.className = 'sync-status disconnected';
-      el.title = '未連線';
+    var t = State.get('lastSyncTime');
+    if (!t) {
+      el.textContent = '--';
+      return;
     }
-    var lastSync = State.get('lastSyncTime');
-    if (lastSync) {
-      var timeStr = new Date(lastSync).toLocaleTimeString('zh-TW');
-      var timeEl = document.getElementById('last-sync-time');
-      if (timeEl) timeEl.textContent = timeStr;
-    }
+    var d = new Date(t);
+    var hh = String(d.getHours()).padStart(2, '0');
+    var mm = String(d.getMinutes()).padStart(2, '0');
+    el.textContent = hh + ':' + mm;
   }
 
-  function afterLogin() {
-    init();
+  /* Called after Firebase auth success */
+  function afterFirebaseReady() {
+    console.log('[App] Firebase ready, starting watchers + sync...');
+    if (typeof startWatchers === 'function') {
+      startWatchers();
+    }
+    if (typeof syncDownloadAll === 'function') {
+      syncDownloadAll();
+    }
   }
 
   return {
     init: init,
-    afterLogin: afterLogin
+    afterFirebaseReady: afterFirebaseReady,
+    loadFromStore: loadFromStore,
+    updateSyncIndicator: updateSyncIndicator,
+    updateLastSyncTime: updateLastSyncTime
   };
 })();

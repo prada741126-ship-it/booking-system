@@ -1,7 +1,8 @@
 /* ============================================================
- * mobile.css — Responsive Mobile Styles
- * Booking System v1.0.0
+ * mobile.css — Responsive Mobile Styles (v8 Light Theme)
+ * Booking System v2.0.0
  * Breakpoints: 768px (tablet), 480px (phone)
+ * 7 pages with bottom nav on mobile
  * ============================================================ */
 
 /* ===== Tablet (<= 768px) ===== */
@@ -132,7 +133,7 @@
     display: none;
   }
 
-  /* Modal full width */
+  /* Modal full width — bottom sheet style */
   .modal-overlay {
     padding: 0;
     align-items: flex-end;
@@ -164,16 +165,6 @@
     width: 100%;
   }
 
-  /* Calendar: simplified */
-  .calendar-cell {
-    min-height: 50px;
-  }
-
-  .calendar-booking-chip {
-    font-size: 9px;
-    padding: 1px 3px;
-  }
-
   /* Toast: bottom on mobile */
   #toast-container {
     top: auto;
@@ -202,6 +193,27 @@
   .search-box {
     width: 100%;
   }
+
+  /* Matrix table: horizontal scroll */
+  .matrix-table {
+    font-size: var(--fs-xs);
+  }
+
+  /* Hotel config room grid: 2 columns */
+  .hc-room-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Employee card: compact */
+  .employee-card {
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  .employee-card .emp-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 /* ===== Phone (<= 480px) ===== */
@@ -211,7 +223,7 @@
     --fs-sm: 0.75rem;
   }
 
-  /* KPI grid: single column on small phones, but 2 for compact */
+  /* KPI grid: 2 columns on small phones */
   .kpi-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -248,21 +260,6 @@
     min-width: 500px;
   }
 
-  /* Calendar: even more compact */
-  .calendar-cell {
-    min-height: 40px;
-    padding: 1px;
-  }
-
-  .calendar-day-num {
-    font-size: 9px;
-  }
-
-  .calendar-booking-chip {
-    font-size: 8px;
-    padding: 0 2px;
-  }
-
   /* Quick filters: scrollable */
   .quick-filters {
     flex-wrap: nowrap;
@@ -286,7 +283,7 @@
     font-size: var(--fs-md);
   }
 
-  /* Topbar: hide month nav subtitle */
+  /* Topbar: compact month nav */
   #topbar .month-nav {
     padding: 2px 4px;
   }
@@ -296,14 +293,9 @@
     height: 24px;
   }
 
-  /* Bot log entries */
-  .bot-log-entry {
-    padding: var(--sp-2) var(--sp-3);
-  }
-
-  .bot-log-entry .log-avatar {
-    width: 32px;
-    height: 32px;
+  /* Hotel config room grid: single column */
+  .hc-room-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -322,7 +314,7 @@
   }
 }
 
-/* ===== Print ===== */
+/* ===== Print (v8: keep for accounting reconciliation) ===== */
 @media print {
   #sidebar,
   #topbar,
@@ -332,7 +324,9 @@
   #toast-container,
   .filter-bar,
   .page-actions,
-  .action-cell {
+  .action-cell,
+  .quick-filters,
+  .sync-loading-bar {
     display: none !important;
   }
 
@@ -352,9 +346,11 @@
   }
 
   .data-table-wrap,
-  .card {
+  .card,
+  .kpi-card {
     border: 1px solid #ccc;
     background: white;
+    box-shadow: none;
   }
 
   .data-table thead th {
@@ -365,6 +361,17 @@
   .data-table tbody td {
     color: black;
     border-bottom: 1px solid #ddd;
+  }
+
+  .data-table tbody tr:nth-child(even) {
+    background: #f9f9f9;
+  }
+
+  /* Keep status badges visible in print */
+  .status-badge,
+  .fee-badge,
+  .smoking-badge {
+    border: 1px solid #999 !important;
   }
 }
 

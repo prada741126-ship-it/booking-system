@@ -1,7 +1,10 @@
 /**
  * agents.js — Agent List Management
- * Pattern: faithfully reused from v13.0.5
+ * v8: Added active flag for deactivation (without deletion)
+ *     Agent != Employee (agent is the customer's representative)
+ * Flow: add/rename/remove/setActive -> State.update -> Store.save -> syncToFirebase -> Events.emit
  */
+
 var Agents = {
 
   /**
@@ -9,7 +12,8 @@ var Agents = {
    */
   add: function (name, phone) {
     if (!name) return null;
-    // Check duplicate
+
+    /* Check duplicate */
     var existing = Agents.findByName(name);
     if (existing) {
       console.warn('[Agents] Duplicate name:', name);
@@ -17,11 +21,13 @@ var Agents = {
     }
 
     var agent = {
+      id:         Utils.generateAgentId(),
       _fbKey:     Utils.generateFbKey(),
       _createdAt: Date.now(),
       _updatedAt: Date.now(),
       name:       name,
-      phone:      phone || ''
+      phone:      phone || '',
+      active:     true
     };
 
     State.update('agentList', function (list) {
@@ -31,51 +37,54 @@ var Agents = {
     Store.saveAgentList(State.get('agentList'));
     syncAgentListToFirebase(State.get('agentList'));
     Events.emit(EVENTS.AGENT_ADDED, agent);
+    console.log('[Agents] Added:', name);
     return agent;
   },
 
   /**
    * Rename an agent
+   * Also updates bookings that reference this agent
    */
   rename: function (oldName, newName) {
     if (!oldName || !newName) return false;
 
+    var renamed = false;
     State.update('agentList', function (list) {
       for (var i = 0; i < list.length; i++) {
-        if ((list[i].name || list[i]) === oldName) {
-          if (typeof list[i] === 'object') {
-            list[i].name = newName;
-            list[i]._updatedAt = Date.now();
-          } else {
-            list[i] = newName;
-          }
+        if (list[i].name === oldName) {
+          list[i].name = newName;
+          list[i]._updatedAt = Date.now();
+          renamed = true;
           break;
         }
       }
       return list;
     });
 
-    Store.saveAgentList(State.get('agentList'));
-    syncAgentListToFirebase(State.get('agentList'));
+    if (renamed) {
+      Store.saveAgentList(State.get('agentList'));
+      syncAgentListToFirebase(State.get('agentList'));
 
-    // Also update bookings that reference this agent
-    var bookings = Bookings.getByAgent(oldName);
-    for (var j = 0; j < bookings.length; j++) {
-      Bookings.update(bookings[j]._fbKey, { agent: newName });
+      /* Update bookings that reference this agent */
+      var bookings = Bookings.getByAgent(oldName);
+      for (var j = 0; j < bookings.length; j++) {
+        Bookings.update(bookings[j]._fbKey, { agent: newName });
+      }
+
+      Events.emit(EVENTS.AGENT_RENAMED, { oldName: oldName, newName: newName });
+      console.log('[Agents] Renamed:', oldName, '->', newName);
     }
-
-    Events.emit(EVENTS.AGENT_RENAMED, { oldName: oldName, newName: newName });
-    return true;
+    return renamed;
   },
 
   /**
-   * Remove an agent
+   * Remove an agent completely
    */
   remove: function (name) {
     var deleted = false;
     State.update('agentList', function (list) {
       for (var i = list.length - 1; i >= 0; i--) {
-        if ((list[i].name || list[i]) === name) {
+        if (list[i].name === name) {
           list.splice(i, 1);
           deleted = true;
           break;
@@ -88,8 +97,49 @@ var Agents = {
       Store.saveAgentList(State.get('agentList'));
       syncAgentListToFirebase(State.get('agentList'));
       Events.emit(EVENTS.AGENT_REMOVED, name);
+      console.log('[Agents] Removed:', name);
     }
     return deleted;
+  },
+
+  /**
+   * Deactivate an agent (keep history, hide from active list)
+   */
+  deactivate: function (name) {
+    return Agents.setActive(name, false);
+  },
+
+  /**
+   * Activate a deactivated agent
+   */
+  activate: function (name) {
+    return Agents.setActive(name, true);
+  },
+
+  /**
+   * Set active flag on an agent
+   */
+  setActive: function (name, active) {
+    var changed = false;
+    State.update('agentList', function (list) {
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].name === name) {
+          list[i].active = active;
+          list[i]._updatedAt = Date.now();
+          changed = true;
+          break;
+        }
+      }
+      return list;
+    });
+
+    if (changed) {
+      Store.saveAgentList(State.get('agentList'));
+      syncAgentListToFirebase(State.get('agentList'));
+      Events.emit(EVENTS.AGENT_LIST_UPDATED, State.get('agentList'));
+      console.log('[Agents] setActive:', name, active);
+    }
+    return changed;
   },
 
   /**
@@ -98,17 +148,24 @@ var Agents = {
   findByName: function (name) {
     var list = State.get('agentList');
     for (var i = 0; i < list.length; i++) {
-      if ((list[i].name || list[i]) === name) return list[i];
+      if (list[i].name === name) return list[i];
     }
     return null;
   },
 
   /**
-   * Get all agent names
+   * Get active agent names only
    */
   getNames: function () {
+    return State.getActiveAgents().map(function (a) { return a.name; });
+  },
+
+  /**
+   * Get all agent names (including inactive)
+   */
+  getAllNames: function () {
     var list = State.get('agentList');
-    return list.map(function (a) { return a.name || a; });
+    return list.map(function (a) { return a.name; });
   },
 
   /**

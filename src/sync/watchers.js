@@ -1,8 +1,8 @@
 /**
  * watchers.js — Firebase Real-time Listeners
- * Pattern: faithfully reused from v13.0.5
- * Features: 4 watchers (bookings/hotelConfig/agentList/botLogs) + clearedAt + connected
- * Each watcher: fetch remote → merge → filter tombstones → save → emit
+ * v8: 7 watchers (bookings/hotelConfig/agentList/employeeList/archives/closedMonths/settings)
+ *     + clearedAt + connected
+ * Each watcher: fetch remote -> merge -> filter tombstones -> save -> emit
  */
 var _watchersStarted = false;
 
@@ -18,7 +18,10 @@ function startWatchers() {
   _watchBookings();
   _watchHotelConfig();
   _watchAgentList();
-  _watchBotLogs();
+  _watchEmployeeList();
+  _watchArchives();
+  _watchClosedMonths();
+  _watchSettings();
   _watchClearedAt();
 }
 
@@ -28,15 +31,9 @@ function _watchBookings() {
     try {
       var remote = Utils.fbObjToArray(snap.val());
       var local = State.get('bookings');
-      var merged = Merger.mergeBookings(local, remote);
-
-      // Clean old tombstones
+      var merged = Merger.mergeArray(local, remote);
       merged = Merger.cleanOldTombstones(merged, CONFIG.TOMBSTONE_TTL_MS);
-
-      // Filter tombstones for display
       var alive = Merger.filterAlive(merged);
-
-      // Check if anything changed
       var changed = _hasChanged(local, alive);
       if (changed) {
         State.set('bookings', alive);
@@ -52,22 +49,19 @@ function _watchBookings() {
   });
 }
 
-/* ===== Hotel Config Watcher ===== */
+/* ===== Hotel Config Watcher (single object) ===== */
 function _watchHotelConfig() {
   _db.ref(FB_PATH.HOTEL_CONFIG).on('value', function (snap) {
     try {
-      var remote = Utils.fbObjToArray(snap.val());
+      var remote = snap.val();
+      if (!remote) return;
       var local = State.get('hotelConfig');
       var merged = Merger.mergeHotelConfig(local, remote);
-      merged = Merger.cleanOldTombstones(merged, CONFIG.TOMBSTONE_TTL_MS);
-      var alive = Merger.filterAlive(merged);
-
-      var changed = _hasChanged(local, alive);
-      if (changed) {
-        State.set('hotelConfig', alive);
-        Store.saveHotelConfig(alive);
-        Events.emit(EVENTS.HC_LOADED, alive);
-        console.log('[Watchers] Hotel config synced:', alive.length, 'items');
+      if (merged && merged !== local) {
+        State.set('hotelConfig', merged);
+        Store.saveHotelConfig(merged);
+        Events.emit(EVENTS.HC_LOADED, merged);
+        console.log('[Watchers] Hotel config synced');
       }
     } catch (e) {
       console.error('[Watchers] HC watcher error:', e);
@@ -81,23 +75,9 @@ function _watchHotelConfig() {
 function _watchAgentList() {
   _db.ref(FB_PATH.AGENT_LIST).on('value', function (snap) {
     try {
-      var remoteObj = snap.val();
-      var remote = [];
-      if (remoteObj) {
-        for (var key in remoteObj) {
-          if (remoteObj.hasOwnProperty(key)) {
-            var item = remoteObj[key];
-            if (item && typeof item === 'object') {
-              remote.push(item);
-            }
-          }
-        }
-      }
-
+      var remote = Utils.fbObjToArray(snap.val());
       var local = State.get('agentList');
-      // Agent list: merge by name (simple union, remote wins if conflict)
-      var merged = _mergeAgentList(local, remote);
-
+      var merged = Merger.mergeAgentList(local, remote);
       var changed = _hasChanged(local, merged);
       if (changed) {
         State.set('agentList', merged);
@@ -113,57 +93,114 @@ function _watchAgentList() {
   });
 }
 
-/* ===== Bot Logs Watcher ===== */
-function _watchBotLogs() {
-  _db.ref(FB_PATH.BOT_LOGS).on('value', function (snap) {
+/* ===== Employee List Watcher ===== */
+function _watchEmployeeList() {
+  _db.ref(FB_PATH.EMPLOYEE_LIST).on('value', function (snap) {
     try {
       var remote = Utils.fbObjToArray(snap.val());
-      var local = State.get('botLogs');
-      var merged = Merger.mergeArray(local, remote);
-      merged = Merger.cleanOldTombstones(merged, CONFIG.TOMBSTONE_TTL_MS);
-      var alive = Merger.filterAlive(merged);
-
-      // Sort by createdAt descending
-      alive.sort(function (a, b) {
-        return (b._createdAt || 0) - (a._createdAt || 0);
-      });
-
-      var changed = _hasChanged(local, alive);
+      var local = State.get('employeeList');
+      var merged = Merger.mergeEmployeeList(local, remote);
+      var changed = _hasChanged(local, merged);
       if (changed) {
-        State.set('botLogs', alive);
-        Store.saveBotLogs(alive);
-        Events.emit(EVENTS.UI_RENDER);
-        console.log('[Watchers] Bot logs synced:', alive.length, 'logs');
+        State.set('employeeList', merged);
+        Store.saveEmployeeList(merged);
+        Events.emit(EVENTS.EMPLOYEE_LIST_UPDATED, merged);
+        console.log('[Watchers] Employee list synced:', merged.length, 'employees');
       }
     } catch (e) {
-      console.error('[Watchers] BotLogs watcher error:', e);
+      console.error('[Watchers] EmployeeList watcher error:', e);
     }
   }, function (err) {
-    console.error('[Watchers] BotLogs listener error:', err);
+    console.error('[Watchers] EmployeeList listener error:', err);
   });
 }
 
-/* ===== ClearedAt Watcher (cross-device "clear all" sync) ===== */
+/* ===== Archives Watcher ===== */
+function _watchArchives() {
+  _db.ref(FB_PATH.ARCHIVES).on('value', function (snap) {
+    try {
+      var remote = Utils.fbObjToArray(snap.val());
+      var local = State.get('archives');
+      var merged = Merger.mergeArray(local, remote);
+      merged = Merger.cleanOldTombstones(merged, CONFIG.TOMBSTONE_TTL_MS);
+      var alive = Merger.filterAlive(merged);
+      var changed = _hasChanged(local, alive);
+      if (changed) {
+        State.set('archives', alive);
+        Store.saveArchives(alive);
+        Events.emit(EVENTS.ARCHIVES_LOADED, alive);
+        console.log('[Watchers] Archives synced:', alive.length, 'items');
+      }
+    } catch (e) {
+      console.error('[Watchers] Archives watcher error:', e);
+    }
+  }, function (err) {
+    console.error('[Watchers] Archives listener error:', err);
+  });
+}
+
+/* ===== Closed Months Watcher ===== */
+function _watchClosedMonths() {
+  _db.ref(FB_PATH.CLOSED_MONTHS).on('value', function (snap) {
+    try {
+      var remote = snap.val();
+      if (!remote || !Array.isArray(remote)) return;
+      var local = State.get('closedMonths') || [];
+      if (JSON.stringify(local) !== JSON.stringify(remote)) {
+        State.set('closedMonths', remote);
+        Store.saveClosedMonths(remote);
+        Events.emit(EVENTS.MONTH_CLOSED, remote);
+        console.log('[Watchers] Closed months synced:', remote);
+      }
+    } catch (e) {
+      console.error('[Watchers] ClosedMonths watcher error:', e);
+    }
+  }, function (err) {
+    console.error('[Watchers] ClosedMonths listener error:', err);
+  });
+}
+
+/* ===== Settings Watcher ===== */
+function _watchSettings() {
+  _db.ref(FB_PATH.SETTINGS).on('value', function (snap) {
+    try {
+      var remote = snap.val();
+      if (!remote) return;
+      var local = State.get('settings') || {};
+      var rTs = remote._updatedAt || 0;
+      var lTs = local._updatedAt || 0;
+      if (rTs > lTs) {
+        State.set('settings', remote);
+        Store.saveSettings(remote);
+        console.log('[Watchers] Settings synced');
+      }
+    } catch (e) {
+      console.error('[Watchers] Settings watcher error:', e);
+    }
+  }, function (err) {
+    console.error('[Watchers] Settings listener error:', err);
+  });
+}
+
+/* ===== ClearedAt Watcher ===== */
 function _watchClearedAt() {
   _db.ref(FB_PATH.CLEARED_AT).on('value', function (snap) {
     try {
       var clearedAt = snap.val();
       if (!clearedAt) return;
-
       var localLastClear = Store.load(STORAGE_KEYS.LAST_SYNC_TIME) || 0;
       if (clearedAt > localLastClear) {
         console.log('[Watchers] Remote clear detected, clearing local data');
-        Store.clearLocalData();
-        var fresh = Store.loadAll();
-        State.batchSet([
-          { key: 'bookings',    value: fresh.bookings    },
-          { key: 'hotelConfig', value: fresh.hotelConfig },
-          { key: 'botLogs',     value: fresh.botLogs     }
-        ]);
-        // Preserve agent list
-        State.set('agentList', Store.loadAgentList());
-        Events.emit(EVENTS.UI_RENDER);
-        Store.save(STORAGE_KEYS.LAST_SYNC_TIME, clearedAt, false);
+        Store.clearAll(true); /* keep agent list */
+        /* Also keep employee list */
+        var employees = State.get('employeeList');
+        App.loadFromStore();
+        if (employees) {
+          State.set('employeeList', employees);
+          Store.saveEmployeeList(employees);
+        }
+        Events.emit(EVENTS.UI_RENDER, {});
+        Store.save(STORAGE_KEYS.LAST_SYNC_TIME, clearedAt);
       }
     } catch (e) {
       console.error('[Watchers] ClearedAt watcher error:', e);
@@ -179,26 +216,26 @@ function syncDownloadAll(callback) {
   }
   console.log('[Watchers] Starting manual download sync');
 
-  var pending = 4;
+  var pending = 6;
   var results = {};
 
-  function _done(key, data) {
-    results[key] = data;
+  function _done(key, count) {
+    results[key] = count;
     pending--;
     if (pending === 0) {
       State.set('lastSyncTime', Date.now());
       Events.emit(EVENTS.SYNC_DOWNLOAD_DONE, results);
-      console.log('[Watchers] Download sync complete');
+      console.log('[Watchers] Download sync complete', results);
       if (callback) callback(null, results);
     }
   }
 
-  // Bookings
+  /* Bookings */
   _db.ref(FB_PATH.BOOKINGS).once('value', function (snap) {
     try {
       var remote = Utils.fbObjToArray(snap.val());
       var local = State.get('bookings');
-      var merged = Merger.mergeBookings(local, remote);
+      var merged = Merger.mergeArray(local, remote);
       merged = Merger.cleanOldTombstones(merged, CONFIG.TOMBSTONE_TTL_MS);
       var alive = Merger.filterAlive(merged);
       State.set('bookings', alive);
@@ -210,37 +247,30 @@ function syncDownloadAll(callback) {
     }
   });
 
-  // Hotel config
+  /* Hotel config */
   _db.ref(FB_PATH.HOTEL_CONFIG).once('value', function (snap) {
     try {
-      var remote = Utils.fbObjToArray(snap.val());
-      var local = State.get('hotelConfig');
-      var merged = Merger.mergeHotelConfig(local, remote);
-      merged = Merger.cleanOldTombstones(merged, CONFIG.TOMBSTONE_TTL_MS);
-      var alive = Merger.filterAlive(merged);
-      State.set('hotelConfig', alive);
-      Store.saveHotelConfig(alive);
-      _done('hotelConfig', alive.length);
+      var remote = snap.val();
+      if (remote) {
+        var local = State.get('hotelConfig');
+        var merged = Merger.mergeHotelConfig(local, remote);
+        State.set('hotelConfig', merged);
+        Store.saveHotelConfig(merged);
+        Events.emit(EVENTS.HC_LOADED, merged);
+      }
+      _done('hotelConfig', 1);
     } catch (e) {
       console.error('[Watchers] Download HC error:', e);
       _done('hotelConfig', 0);
     }
   });
 
-  // Agent list
+  /* Agent list */
   _db.ref(FB_PATH.AGENT_LIST).once('value', function (snap) {
     try {
-      var remoteObj = snap.val();
-      var remote = [];
-      if (remoteObj) {
-        for (var key in remoteObj) {
-          if (remoteObj.hasOwnProperty(key)) {
-            remote.push(remoteObj[key]);
-          }
-        }
-      }
+      var remote = Utils.fbObjToArray(snap.val());
       var local = State.get('agentList');
-      var merged = _mergeAgentList(local, remote);
+      var merged = Merger.mergeAgentList(local, remote);
       State.set('agentList', merged);
       Store.saveAgentList(merged);
       _done('agentList', merged.length);
@@ -250,34 +280,59 @@ function syncDownloadAll(callback) {
     }
   });
 
-  // Bot logs
-  _db.ref(FB_PATH.BOT_LOGS).once('value', function (snap) {
+  /* Employee list */
+  _db.ref(FB_PATH.EMPLOYEE_LIST).once('value', function (snap) {
     try {
       var remote = Utils.fbObjToArray(snap.val());
-      var local = State.get('botLogs');
+      var local = State.get('employeeList');
+      var merged = Merger.mergeEmployeeList(local, remote);
+      State.set('employeeList', merged);
+      Store.saveEmployeeList(merged);
+      _done('employeeList', merged.length);
+    } catch (e) {
+      console.error('[Watchers] Download employeeList error:', e);
+      _done('employeeList', 0);
+    }
+  });
+
+  /* Archives */
+  _db.ref(FB_PATH.ARCHIVES).once('value', function (snap) {
+    try {
+      var remote = Utils.fbObjToArray(snap.val());
+      var local = State.get('archives');
       var merged = Merger.mergeArray(local, remote);
       merged = Merger.cleanOldTombstones(merged, CONFIG.TOMBSTONE_TTL_MS);
       var alive = Merger.filterAlive(merged);
-      alive.sort(function (a, b) {
-        return (b._createdAt || 0) - (a._createdAt || 0);
-      });
-      State.set('botLogs', alive);
-      Store.saveBotLogs(alive);
-      _done('botLogs', alive.length);
+      State.set('archives', alive);
+      Store.saveArchives(alive);
+      _done('archives', alive.length);
     } catch (e) {
-      console.error('[Watchers] Download botLogs error:', e);
-      _done('botLogs', 0);
+      console.error('[Watchers] Download archives error:', e);
+      _done('archives', 0);
+    }
+  });
+
+  /* Closed months */
+  _db.ref(FB_PATH.CLOSED_MONTHS).once('value', function (snap) {
+    try {
+      var remote = snap.val();
+      if (remote && Array.isArray(remote)) {
+        State.set('closedMonths', remote);
+        Store.saveClosedMonths(remote);
+      }
+      _done('closedMonths', 1);
+    } catch (e) {
+      console.error('[Watchers] Download closedMonths error:', e);
+      _done('closedMonths', 0);
     }
   });
 }
 
-/* ===== Helper Functions ===== */
-
+/* ===== Helper ===== */
 function _hasChanged(local, remote) {
   if (!local && !remote) return false;
   if (!local || !remote) return true;
   if (local.length !== remote.length) return true;
-  // Quick check: compare _updatedAt sums
   var localSum = 0, remoteSum = 0;
   for (var i = 0; i < local.length; i++) {
     localSum += (local[i]._updatedAt || 0);
@@ -286,33 +341,4 @@ function _hasChanged(local, remote) {
     remoteSum += (remote[j]._updatedAt || 0);
   }
   return localSum !== remoteSum;
-}
-
-function _mergeAgentList(local, remote) {
-  local = local || [];
-  remote = remote || [];
-  var map = {};
-  var merged = [];
-
-  // Index local by name
-  for (var i = 0; i < local.length; i++) {
-    var name = local[i].name || local[i];
-    map[name] = local[i];
-  }
-
-  // Merge remote (union, remote wins on conflict)
-  for (var j = 0; j < remote.length; j++) {
-    var rName = remote[j].name || remote[j];
-    if (!map[rName]) {
-      map[rName] = remote[j];
-    }
-  }
-
-  for (var key in map) {
-    if (map.hasOwnProperty(key)) {
-      merged.push(map[key]);
-    }
-  }
-
-  return merged;
 }

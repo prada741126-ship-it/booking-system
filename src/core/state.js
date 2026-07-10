@@ -1,109 +1,107 @@
 /**
- * state.js — Central State Manager
- * Pattern: faithfully reused from v13.0.5
- * Features: single source of truth, auto-emit on set, batchSet, update, nextId
+ * state.js — Global State Manager
+ * Single source of truth for runtime state
+ * All mutations go through State.set() which emits events
  */
 var State = (function () {
   var _state = {
+    /* Data collections */
     bookings: [],
-    hotelConfig: [],
+    hotelConfig: null,
     agentList: [],
-    botLogs: [],
-    workingMonth: null,
+    employeeList: [],
+    archives: [],
+    closedMonths: [],
+    settings: {},
+    /* UI state */
     currentPage: 'overview',
+    workingMonth: null,
+    isLoggedIn: false,
+    /* Sync state */
     syncConnected: false,
+    syncInProgress: false,
     lastSyncTime: null,
-    auth: null
-  };
-
-  var _nextId = 1;
-
-  /* Map state paths to events for auto-emit */
-  var _pathEvents = {
-    'bookings':       EVENTS.BOOKINGS_LOADED,
-    'hotelConfig':    EVENTS.HC_LOADED,
-    'agentList':      EVENTS.AGENT_LIST_UPDATED,
-    'botLogs':        EVENTS.UI_RENDER,
-    'workingMonth':   EVENTS.MONTH_CHANGED,
-    'currentPage':    EVENTS.PAGE_CHANGED,
-    'syncConnected':  EVENTS.SYNC_STATUS,
-    'lastSyncTime':   EVENTS.SYNC_STATUS
+    /* Draft state */
+    draft: null,
+    /* Filters */
+    activeFilters: {}
   };
 
   function get(key) {
-    return key ? _state[key] : _state;
+    if (key === undefined) return _state;
+    return _state[key];
   }
 
   function set(key, value) {
+    var old = _state[key];
     _state[key] = value;
-    var evt = _pathEvents[key];
-    if (evt) {
-      Events.emit(evt, value);
+    if (old !== value) {
+      Events.emit(EVENTS.UI_RENDER, { key: key, oldValue: old, newValue: value });
     }
   }
 
-  function batchSet(pairs) {
-    var eventsToEmit = [];
-    for (var i = 0; i < pairs.length; i++) {
-      var pair = pairs[i];
-      _state[pair.key] = pair.value;
-      var evt = _pathEvents[pair.key];
-      if (evt && eventsToEmit.indexOf(evt) === -1) {
-        eventsToEmit.push(evt);
-      }
-    }
-    // Emit deduplicated events after all sets
-    for (var j = 0; j < eventsToEmit.length; j++) {
-      Events.emit(eventsToEmit[j]);
-    }
-  }
-
-  function update(key, fn) {
+  function update(key, updater) {
     var current = _state[key];
-    if (current === undefined) {
-      console.error('[State] Unknown key:', key);
-      return;
-    }
-    var updated = fn(current);
-    if (updated !== undefined) {
-      _state[key] = updated;
-    }
-    var evt = _pathEvents[key];
-    if (evt) {
-      Events.emit(evt, _state[key]);
-    }
+    var updated = typeof updater === 'function' ? updater(current) : updater;
+    set(key, updated);
   }
 
-  function nextId() {
-    return 'BK' + String(Date.now()).slice(-8) + String(_nextId++).padStart(3, '0');
+  /* Convenience getters */
+  function getBookings() {
+    return _state.bookings.filter(function (b) { return !b._deleted; });
   }
 
-  function resetNextId() {
-    _nextId = 1;
+  function getAllBookings() {
+    return _state.bookings;
   }
 
-  function reset() {
-    _state = {
-      bookings: [],
-      hotelConfig: [],
-      agentList: [],
-      botLogs: [],
-      workingMonth: null,
-      currentPage: 'overview',
-      syncConnected: false,
-      lastSyncTime: null,
-      auth: null
-    };
-    _nextId = 1;
+  function getActiveAgents() {
+    return _state.agentList.filter(function (a) { return a.active !== false; });
+  }
+
+  function getActiveEmployees() {
+    return _state.employeeList.filter(function (e) { return e.active !== false; });
+  }
+
+  function getArchives() {
+    return _state.archives;
+  }
+
+  function getHotelConfig() {
+    return _state.hotelConfig;
+  }
+
+  function getWorkingMonth() {
+    return _state.workingMonth;
+  }
+
+  function isMonthClosed(monthStr) {
+    return _state.closedMonths.indexOf(monthStr) !== -1;
+  }
+
+  function getSettings() {
+    return _state.settings || {};
+  }
+
+  function getRecentAgents(employeeId) {
+    var settings = _state.settings || {};
+    var recentMap = settings.recentAgents || {};
+    return recentMap[employeeId] || [];
   }
 
   return {
     get: get,
     set: set,
-    batchSet: batchSet,
     update: update,
-    nextId: nextId,
-    resetNextId: resetNextId,
-    reset: reset
+    getBookings: getBookings,
+    getAllBookings: getAllBookings,
+    getActiveAgents: getActiveAgents,
+    getActiveEmployees: getActiveEmployees,
+    getArchives: getArchives,
+    getHotelConfig: getHotelConfig,
+    getWorkingMonth: getWorkingMonth,
+    isMonthClosed: isMonthClosed,
+    getSettings: getSettings,
+    getRecentAgents: getRecentAgents
   };
 })();

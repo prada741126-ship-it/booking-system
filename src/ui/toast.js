@@ -1,7 +1,6 @@
 /**
  * toast.js — Toast Notification System
- * Booking System v1.0.0
- * Pattern: reused from v13.0.5
+ * Booking System v2.0.0 (v8 spec)
  * Types: success / error / warning / info
  */
 var Toast = (function () {

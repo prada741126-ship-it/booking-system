@@ -1,8 +1,7 @@
 /**
  * modal.js — Modal Dialog System
- * Booking System v1.0.0
- * Pattern: reused from v13.0.5
- * Features: open/close, form hosting, backdrop click, escape
+ * Booking System v2.0.0 (v8 spec)
+ * Features: open/close, form hosting, backdrop click, escape, confirm dialog
  */
 var Modal = (function () {
   var _activeModal = null;

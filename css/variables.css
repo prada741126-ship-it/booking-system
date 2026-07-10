@@ -1,60 +1,70 @@
 /* ============================================================
- * variables.css — Design Token System
- * Booking System v1.0.0
- * Theme: Dark Tech / Cyberpunk-inspired
+ * variables.css — Design Token System (v8 Light Theme)
+ * Booking System v2.0.0
+ * Theme: Bright, clean, professional — NOT nightclub/cyberpunk
+ * Color values mirror UI_COLORS in constants.js
  * ============================================================ */
 
 :root {
-  /* ===== Color Palette ===== */
-  --color-tech-cyan: #00d4ff;
-  --color-sky-blue: #0095ff;
-  --color-electric-violet: #7c3aed;
+  /* ===== Primary Accents ===== */
+  --color-primary: #2563eb;        /* blue-600 */
+  --color-primary-light: #3b82f6;  /* blue-500 */
+  --color-primary-dark: #1d4ed8;   /* blue-700 */
+  --color-success: #16a34a;        /* green-600 */
+  --color-success-light: #22c55e;  /* green-500 */
+  --color-warning: #f59e0b;        /* amber-500 */
+  --color-danger: #ef4444;         /* red-500 */
+  --color-danger-light: #f87171;   /* red-400 */
+  --color-info: #0ea5e9;           /* sky-500 */
   --color-gold-soft: #c9a84c;
   --color-gold-light: #D4A844;
-  --color-vermilion: #c0392b;
-  --color-success: #2dd4a0;
-  --color-warning: #f0a500;
-  --color-danger: #f85149;
-  --color-info: #58a6ff;
-  --color-cash-orange: #e67e22;
 
-  /* ===== Backgrounds ===== */
-  --bg-base: #0a0a0f;
-  --bg-elevated: #161b22;
-  --bg-surface: #0d1117;
-  --bg-overlay: rgba(10, 10, 15, 0.85);
-  --bg-glass: rgba(22, 27, 34, 0.7);
-  --bg-glass-hover: rgba(30, 38, 48, 0.8);
-  --bg-input: rgba(13, 17, 23, 0.8);
+  /* ===== Backgrounds (Light) ===== */
+  --bg-base: #f0f2f5;              /* light gray page bg */
+  --bg-elevated: #ffffff;          /* white cards */
+  --bg-surface: #ffffff;           /* white surfaces */
+  --bg-hover: #f8fafc;             /* very light hover */
+  --bg-overlay: rgba(0, 0, 0, 0.4);
+  --bg-glass: rgba(255, 255, 255, 0.92);
+  --bg-glass-hover: #f1f5f9;
+  --bg-input: #ffffff;
 
-  /* ===== Text ===== */
-  --text-primary: #e6edf3;
-  --text-secondary: #8b949e;
-  --text-muted: #6e7681;
-  --text-inverse: #0a0a0f;
+  /* ===== Text (Dark on Light) ===== */
+  --text-primary: #1e293b;         /* slate-800 */
+  --text-secondary: #475569;       /* slate-600 */
+  --text-muted: #94a3b8;           /* slate-400 */
+  --text-inverse: #ffffff;
 
-  /* ===== Borders ===== */
-  --border-default: #30363d;
-  --border-hover: #484f58;
-  --border-focus: var(--color-tech-cyan);
-  --border-subtle: rgba(48, 54, 61, 0.5);
+  /* ===== Borders (Light) ===== */
+  --border-default: #e2e8f0;       /* slate-200 */
+  --border-hover: #cbd5e1;         /* slate-300 */
+  --border-focus: var(--color-primary-light);
+  --border-subtle: rgba(226, 232, 240, 0.6);
 
   /* ===== Status Colors ===== */
   --status-pending: var(--color-warning);
-  --status-confirmed: var(--color-tech-cyan);
+  --status-confirmed: var(--color-primary-light);
   --status-checked-in: var(--color-success);
-  --status-checked-out: var(--text-muted);
+  --status-checked-out: #64748b;   /* slate-500 */
   --status-cancelled: var(--color-danger);
+  --status-archived: var(--text-muted);
 
-  /* ===== Gradients ===== */
-  --grad-cyan-violet: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
-  --grad-violet-cyan: linear-gradient(135deg, #7c3aed 0%, #00d4ff 100%);
+  /* ===== Fee Type Colors ===== */
+  --fee-free: var(--color-success);
+  --fee-paid: var(--color-warning);
+
+  /* ===== Smoking Colors ===== */
+  --smoking-yes: var(--color-danger);
+  --smoking-no: var(--color-success-light);
+  --smoking-unknown: var(--text-muted);
+
+  /* ===== Gradients (Subtle, professional) ===== */
+  --grad-primary: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  --grad-primary-dark: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
   --grad-gold: linear-gradient(135deg, #c9a84c 0%, #D4A844 100%);
-  --grad-success: linear-gradient(135deg, #2dd4a0 0%, #00d4ff 100%);
-  --grad-danger: linear-gradient(135deg, #f85149 0%, #c0392b 100%);
-  --grad-surface: linear-gradient(180deg, rgba(22, 27, 34, 0.9) 0%, rgba(13, 17, 23, 0.95) 100%);
-  --grad-glow-cyan: radial-gradient(ellipse at top, rgba(0, 212, 255, 0.08) 0%, transparent 60%);
-  --grad-glow-violet: radial-gradient(ellipse at bottom, rgba(124, 58, 237, 0.06) 0%, transparent 60%);
+  --grad-success: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  --grad-danger: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+  --grad-surface: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 
   /* ===== Typography ===== */
   --font-sans: 'Segoe UI', 'Microsoft JhengHei', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -102,15 +112,14 @@
   --radius-2xl: 20px;
   --radius-full: 9999px;
 
-  /* ===== Shadows ===== */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.6);
-  --shadow-glow-cyan: 0 0 20px rgba(0, 212, 255, 0.15);
-  --shadow-glow-violet: 0 0 20px rgba(124, 58, 237, 0.15);
-  --shadow-glow-success: 0 0 20px rgba(45, 212, 160, 0.15);
-  --shadow-glow-danger: 0 0 20px rgba(248, 81, 73, 0.15);
+  /* ===== Shadows (Light theme: softer, no glow) ===== */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.15);
+  --shadow-primary: 0 4px 12px rgba(37, 99, 235, 0.2);
+  --shadow-success: 0 4px 12px rgba(22, 163, 74, 0.2);
+  --shadow-danger: 0 4px 12px rgba(239, 68, 68, 0.2);
 
   /* ===== Transitions ===== */
   --tr-fast: 0.15s ease;
@@ -138,11 +147,11 @@
   --content-max-w: 1400px;
   --kpi-card-min-w: 200px;
 
-  /* ===== Scrollbar ===== */
+  /* ===== Scrollbar (Light) ===== */
   --scrollbar-w: 8px;
-  --scrollbar-track: rgba(13, 17, 23, 0.5);
-  --scrollbar-thumb: #30363d;
-  --scrollbar-thumb-hover: #484f58;
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
 }
 
 /* ============================================================
@@ -168,8 +177,6 @@ body {
   line-height: var(--lh-normal);
   color: var(--text-primary);
   background-color: var(--bg-base);
-  background-image: var(--grad-glow-cyan), var(--grad-glow-violet);
-  background-attachment: fixed;
   min-height: 100vh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
@@ -205,25 +212,25 @@ body {
 
 /* ===== Selection ===== */
 ::selection {
-  background: rgba(0, 212, 255, 0.25);
+  background: rgba(37, 99, 235, 0.15);
   color: var(--text-primary);
 }
 
 /* ===== Focus Visible ===== */
 :focus-visible {
-  outline: 2px solid var(--color-tech-cyan);
+  outline: 2px solid var(--color-primary-light);
   outline-offset: 2px;
 }
 
 /* ===== Link Reset ===== */
 a {
-  color: var(--color-tech-cyan);
+  color: var(--color-primary);
   text-decoration: none;
   transition: color var(--tr-fast);
 }
 
 a:hover {
-  color: var(--color-sky-blue);
+  color: var(--color-primary-dark);
 }
 
 /* ===== Input Reset ===== */
