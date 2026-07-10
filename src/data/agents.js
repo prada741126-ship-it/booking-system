@@ -90,6 +90,7 @@ var Agents = {
           break;
         }
       }
+      list._updatedAt = Date.now();
       return list;
     });
 

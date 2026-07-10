@@ -195,6 +195,7 @@ function syncAgentListToFirebase(agentList, callback) {
       var key = agentList[i].id || Utils.encodeFirebaseKey(agentList[i].name || ('agent_' + i));
       data[key] = agentList[i];
     }
+    data._updatedAt = agentList._updatedAt || Date.now();
     _db.ref(FB_PATH.AGENT_LIST).set(data, function (err) {
       if (err) {
         console.error('[Firebase] AgentList set error:', err);
@@ -222,6 +223,7 @@ function syncEmployeeListToFirebase(employeeList, callback) {
       var key = employeeList[i].id || Utils.encodeFirebaseKey(employeeList[i].tgId || ('emp_' + i));
       data[key] = employeeList[i];
     }
+    data._updatedAt = employeeList._updatedAt || Date.now();
     _db.ref(FB_PATH.EMPLOYEE_LIST).set(data, function (err) {
       if (err) {
         console.error('[Firebase] EmployeeList set error:', err);

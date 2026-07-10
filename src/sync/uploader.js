@@ -126,7 +126,7 @@ var Uploader = (function () {
       { path: FB_PATH.SETTINGS, data: State.get('settings'), syncFn: syncSettingsToFirebase }
     ];
 
-    var pending = arrayPaths.length + objectPaths.length + 2; /* +2 for agent & employee list */
+    var pending = arrayPaths.length + objectPaths.length; /* agent & employee handled by individual sync */
     var hasError = false;
 
     function _checkDone(err) {
@@ -153,22 +153,6 @@ var Uploader = (function () {
         _checkDone(null);
       }
     });
-
-    /* Agent list */
-    var agentList = State.get('agentList');
-    if (agentList && agentList.length > 0) {
-      syncAgentListToFirebase(agentList, _checkDone);
-    } else {
-      _checkDone(null);
-    }
-
-    /* Employee list */
-    var employeeList = State.get('employeeList');
-    if (employeeList && employeeList.length > 0) {
-      syncEmployeeListToFirebase(employeeList, _checkDone);
-    } else {
-      _checkDone(null);
-    }
   }
 
   function _uploadArrayPath(path, dataArray, type, done) {

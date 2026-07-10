@@ -98,6 +98,7 @@ var Employees = {
           break;
         }
       }
+      list._updatedAt = Date.now();
       return list;
     });
 
