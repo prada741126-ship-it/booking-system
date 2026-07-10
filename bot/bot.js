@@ -3387,5 +3387,55 @@ process.on('SIGTERM', function () {
   process.exit(0);
 });
 
+/* ============================================================
+ * Process-level Error Handling & Heartbeat
+ * ============================================================ */
+
+/* Catch uncaught exceptions — log and continue instead of crashing */
+process.on('uncaughtException', function (err) {
+  console.error('[Bot][CRITICAL] Uncaught Exception:', err);
+  console.error('[Bot][CRITICAL] Stack:', err.stack || 'No stack');
+  console.error('[Bot] Bot will attempt to continue running...');
+  /* Write to bot log in Firebase if possible */
+  try {
+    writeBotLog({
+      _fbKey: generateFbKey(),
+      _createdAt: Date.now(),
+      action: 'critical_error',
+      message: 'Uncaught exception: ' + (err.message || String(err)),
+      stack: err.stack || '',
+      level: 'CRITICAL'
+    });
+  } catch (e2) { /* silently ignore */ }
+});
+
+/* Catch unhandled promise rejections */
+process.on('unhandledRejection', function (reason, promise) {
+  console.error('[Bot][CRITICAL] Unhandled Rejection:', reason);
+  console.error('[Bot] Bot will attempt to continue running...');
+  try {
+    writeBotLog({
+      _fbKey: generateFbKey(),
+      _createdAt: Date.now(),
+      action: 'critical_error',
+      message: 'Unhandled rejection: ' + (reason && reason.message ? reason.message : String(reason)),
+      level: 'CRITICAL'
+    });
+  } catch (e2) { /* silently ignore */ }
+});
+
+/* Heartbeat — log every 5 minutes that bot is alive */
+var _heartbeatCounter = 0;
+var _heartbeatStartTime = Date.now();
+setInterval(function () {
+  _heartbeatCounter++;
+  var uptime = Math.floor((Date.now() - _heartbeatStartTime) / 1000);
+  var mem = process.memoryUsage();
+  var memMB = Math.round(mem.rss / 1024 / 1024);
+  console.log('[Bot][HEARTBEAT] #' + _heartbeatCounter +
+    ' | Uptime: ' + uptime + 's | Memory: ' + memMB + 'MB | ' +
+    new Date().toISOString());
+}, 5 * 60 * 1000);
+
 /* Start the bot */
 start();

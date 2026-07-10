@@ -35,6 +35,21 @@ function closeSidebar() {
 }
 
 /* ============================================================
+ * Mobile More Nav — toggle popup for additional pages
+ * ============================================================ */
+
+function toggleMoreNav() {
+  var popup = document.getElementById('more-nav-popup');
+  if (popup) popup.classList.toggle('visible');
+}
+
+function closeMoreNav(event) {
+  if (event && event.target && event.target.id !== 'more-nav-popup') return;
+  var popup = document.getElementById('more-nav-popup');
+  if (popup) popup.classList.remove('visible');
+}
+
+/* ============================================================
  * Booking Modal — Create / Edit / View / Delete
  * v8 fields: guestName, agent, employee, casino, hotel, roomType,
  *            checkIn, checkOut, smoking, feeStatus, currency,

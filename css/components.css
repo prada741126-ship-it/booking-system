@@ -25,6 +25,27 @@
   box-shadow: var(--shadow-sm);
 }
 
+.kpi-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  opacity: 0.04;
+  transform: translate(30px, -30px);
+  transition: opacity var(--tr-normal);
+  pointer-events: none;
+}
+
+.kpi-card.kpi-blue::after { background: var(--color-primary); }
+.kpi-card.kpi-green::after { background: var(--color-success); }
+.kpi-card.kpi-gold::after { background: var(--color-gold-soft); }
+.kpi-card.kpi-amber::after { background: var(--color-warning); }
+.kpi-card.kpi-red::after { background: var(--color-danger); }
+.kpi-card.kpi-slate::after { background: #64748b; }
+
 .kpi-card::before {
   content: '';
   position: absolute;
@@ -45,8 +66,12 @@
 
 .kpi-card:hover {
   border-color: var(--border-hover);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   box-shadow: var(--shadow-lg);
+}
+
+.kpi-card:hover::after {
+  opacity: 0.08;
 }
 
 .kpi-card .kpi-header {
@@ -284,9 +309,13 @@
   transition: all var(--tr-fast);
 }
 
+.form-control:hover:not(:disabled) {
+  border-color: var(--border-hover);
+}
+
 .form-control:focus {
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
   outline: none;
 }
 
@@ -350,7 +379,7 @@ textarea.form-control {
 }
 
 .data-table thead th {
-  background: var(--bg-base);
+  background: linear-gradient(180deg, var(--bg-base) 0%, #e2e8f0 100%);
   padding: var(--sp-3) var(--sp-4);
   text-align: left;
   font-weight: var(--fw-semibold);
@@ -358,7 +387,7 @@ textarea.form-control {
   font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--border-default);
+  border-bottom: 2px solid var(--border-hover);
   white-space: nowrap;
   position: sticky;
   top: 0;
@@ -377,11 +406,12 @@ textarea.form-control {
 }
 
 .data-table tbody tr:nth-child(even) {
-  background: rgba(248, 250, 252, 0.5);
+  background: rgba(241, 245, 249, 0.6);
 }
 
 .data-table tbody tr:hover {
-  background: rgba(37, 99, 235, 0.04);
+  background: rgba(37, 99, 235, 0.06);
+  box-shadow: inset 3px 0 0 var(--color-primary);
 }
 
 .data-table tbody tr:last-child td {
@@ -408,10 +438,10 @@ textarea.form-control {
 /* Summary row in table */
 .data-table tfoot td {
   padding: var(--sp-3) var(--sp-4);
-  background: var(--bg-base);
+  background: linear-gradient(180deg, var(--bg-base) 0%, #e2e8f0 100%);
   font-weight: var(--fw-bold);
   color: var(--text-primary);
-  border-top: 2px solid var(--border-default);
+  border-top: 2px solid var(--color-primary);
 }
 
 /* ===== Status Badges ===== */
@@ -893,10 +923,30 @@ textarea.form-control {
 }
 
 .empty-state .empty-icon {
-  width: 64px;
-  height: 64px;
+  width: 80px;
+  height: 80px;
   margin-bottom: var(--sp-4);
-  opacity: 0.3;
+  opacity: 0.25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  animation: emptyFloat 3s ease-in-out infinite;
+}
+
+.empty-state .empty-icon::before {
+  content: '';
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.06) 0%, transparent 70%);
+  z-index: -1;
+}
+
+@keyframes emptyFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 
 .empty-state .empty-icon svg {
@@ -959,6 +1009,51 @@ textarea.form-control {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* ===== Global Loading Overlay ===== */
+#loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-toast);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+#loading-overlay.visible {
+  display: flex;
+  animation: loadingFadeIn 0.2s var(--tr-fast);
+}
+
+@keyframes loadingFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+#loading-overlay .loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+#loading-overlay .loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(37, 99, 235, 0.15);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+#loading-overlay .loading-text {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-secondary);
 }
 
 /* ===== Divider ===== */

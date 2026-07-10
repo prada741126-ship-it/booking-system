@@ -148,6 +148,24 @@ var App = (function () {
       console.error('[App] Sync error:', data);
     });
 
+    /* Loading overlay control */
+    Events.on(EVENTS.UI_LOADING, function (data) {
+      if (data && data.show) {
+        App.showLoading(data.text || '載入中...');
+      } else {
+        App.hideLoading();
+      }
+    });
+
+    /* Show loading during sync upload */
+    Events.on(EVENTS.SYNC_UPLOAD_START, function () {
+      App.showLoading('同步中...');
+    });
+
+    Events.on(EVENTS.SYNC_UPLOAD_DONE, function () {
+      App.hideLoading();
+    });
+
     /* Month changed -> re-render */
     Events.on(EVENTS.MONTH_CHANGED, function () {
       Events.emit(EVENTS.UI_RENDER, {});
@@ -186,6 +204,15 @@ var App = (function () {
     if (text) {
       text.textContent = connected ? '已連線' : '未連線';
     }
+    /* Toggle offline indicator in topbar */
+    var offlineEl = document.getElementById('offline-indicator');
+    if (offlineEl) {
+      if (connected) {
+        offlineEl.classList.remove('visible');
+      } else {
+        offlineEl.classList.add('visible');
+      }
+    }
   }
 
   function updateLastSyncTime() {
@@ -213,11 +240,26 @@ var App = (function () {
     }
   }
 
+  /* Loading overlay control */
+  function showLoading(text) {
+    var overlay = document.getElementById('loading-overlay');
+    var textEl = document.getElementById('loading-text');
+    if (textEl) textEl.textContent = text || '載入中...';
+    if (overlay) overlay.classList.add('visible');
+  }
+
+  function hideLoading() {
+    var overlay = document.getElementById('loading-overlay');
+    if (overlay) overlay.classList.remove('visible');
+  }
+
   return {
     init: init,
     afterFirebaseReady: afterFirebaseReady,
     loadFromStore: loadFromStore,
     updateSyncIndicator: updateSyncIndicator,
-    updateLastSyncTime: updateLastSyncTime
+    updateLastSyncTime: updateLastSyncTime,
+    showLoading: showLoading,
+    hideLoading: hideLoading
   };
 })();

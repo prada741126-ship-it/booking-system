@@ -72,13 +72,13 @@ var OverviewPage = (function () {
     html += '    費用分佈';
     html += '  </div>';
     var fs = summ.feeStats;
-    html += _statRow('免費房', fs.free.count + ' 間', 'fee-badge free');
-    html += _statRow('收費房', fs.paid.count + ' 間', 'fee-badge paid');
+    html += _feeDonut(fs.free.count, fs.paid.count);
     if (fs.paid.count > 0) {
-      html += '<div style="border-top:1px solid var(--border-default);margin-top:var(--sp-2);padding-top:var(--sp-2);">';
+      html += '<div style="border-top:1px solid var(--border-default);margin-top:var(--sp-3);padding-top:var(--sp-3);">';
       html += _statRow('向客人收', Utils.formatCurrency(fs.paid.chargeGuest, CURRENCY_DEFAULT), '');
       html += _statRow('交公司', Utils.formatCurrency(fs.paid.chargeCompany, CURRENCY_DEFAULT), '');
-      html += _statRow('利潤', Utils.formatCurrency(fs.paid.profit, CURRENCY_DEFAULT), '');
+      var profitColor = fs.paid.profit >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
+      html += '<div class="stat-row"><span class="stat-label">利潤</span><span class="stat-value" style="color:' + profitColor + ';">' + Utils.formatCurrency(fs.paid.profit, CURRENCY_DEFAULT) + '</span></div>';
       html += '</div>';
     }
     html += '</div>';
@@ -139,12 +139,17 @@ var OverviewPage = (function () {
 
   function _statusRow(label, count, total, color) {
     var pct = total > 0 ? (count / total * 100) : 0;
-    var html = '<div class="stat-row">';
-    html += '  <span class="stat-label" style="display:flex;align-items:center;gap:6px;">';
-    html += '    <span style="width:8px;height:8px;border-radius:50%;background:' + color + ';"></span>';
-    html += '    ' + Utils.escapeHtml(label);
-    html += '  </span>';
-    html += '  <span class="stat-value">' + count + ' <span style="color:var(--text-muted);font-weight:400;font-size:var(--fs-xs);">(' + pct.toFixed(0) + '%)</span></span>';
+    var html = '<div class="stat-row" style="flex-direction:column;align-items:stretch;gap:4px;">';
+    html += '  <div style="display:flex;justify-content:space-between;align-items:center;">';
+    html += '    <span class="stat-label" style="display:flex;align-items:center;gap:6px;">';
+    html += '      <span style="width:8px;height:8px;border-radius:50%;background:' + color + ';"></span>';
+    html += '      ' + Utils.escapeHtml(label);
+    html += '    </span>';
+    html += '    <span class="stat-value">' + count + ' <span style="color:var(--text-muted);font-weight:400;font-size:var(--fs-xs);">(' + pct.toFixed(0) + '%)</span></span>';
+    html += '  </div>';
+    html += '  <div style="height:6px;background:var(--bg-base);border-radius:var(--radius-full);overflow:hidden;">';
+    html += '    <div style="height:100%;width:' + pct.toFixed(1) + '%;background:' + color + ';border-radius:var(--radius-full);transition:width 0.6s var(--tr-smooth);"></div>';
+    html += '  </div>';
     html += '</div>';
     return html;
   }
@@ -152,6 +157,41 @@ var OverviewPage = (function () {
   function _statRow(label, value, badgeClass) {
     var valHtml = badgeClass ? '<span class="' + badgeClass + '">' + value + '</span>' : value;
     return '<div class="stat-row"><span class="stat-label">' + Utils.escapeHtml(label) + '</span><span class="stat-value">' + valHtml + '</span></div>';
+  }
+
+  /* Donut chart for fee distribution (CSS conic-gradient) */
+  function _feeDonut(freeCount, paidCount) {
+    var total = freeCount + paidCount;
+    if (total === 0) {
+      return '<div style="text-align:center;padding:var(--sp-6);color:var(--text-muted);font-size:var(--fs-sm);">暫無數據</div>';
+    }
+    var freePct = total > 0 ? (freeCount / total * 100) : 0;
+    var paidPct = total > 0 ? (paidCount / total * 100) : 0;
+    var freeColor = '#16a34a';
+    var paidColor = '#f59e0b';
+
+    var html = '<div style="display:flex;align-items:center;gap:var(--sp-4);">';
+    /* Donut chart using conic-gradient */
+    html += '<div style="width:110px;height:110px;border-radius:50%;';
+    html += 'background:conic-gradient(' + freeColor + ' 0% ' + freePct.toFixed(1) + '%, ' + paidColor + ' ' + freePct.toFixed(1) + '% 100%);';
+    html += 'display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+    html += 'box-shadow:0 2px 8px rgba(0,0,0,0.08);">';
+    html += '<div style="width:72px;height:72px;border-radius:50%;background:var(--bg-elevated);display:flex;flex-direction:column;align-items:center;justify-content:center;">';
+    html += '<span style="font-size:var(--fs-xl);font-weight:var(--fw-extrabold);color:var(--text-primary);">' + total + '</span>';
+    html += '<span style="font-size:var(--fs-xs);color:var(--text-muted);">總房數</span>';
+    html += '</div></div>';
+    /* Legend */
+    html += '<div style="flex:1;">';
+    html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:var(--sp-2);">';
+    html += '<span style="width:10px;height:10px;border-radius:2px;background:' + freeColor + ';flex-shrink:0;"></span>';
+    html += '<span style="font-size:var(--fs-sm);color:var(--text-secondary);">免費房 ' + freeCount + ' (' + freePct.toFixed(0) + '%)</span>';
+    html += '</div>';
+    html += '<div style="display:flex;align-items:center;gap:6px;">';
+    html += '<span style="width:10px;height:10px;border-radius:2px;background:' + paidColor + ';flex-shrink:0;"></span>';
+    html += '<span style="font-size:var(--fs-sm);color:var(--text-secondary);">收費房 ' + paidCount + ' (' + paidPct.toFixed(0) + '%)</span>';
+    html += '</div>';
+    html += '</div></div>';
+    return html;
   }
 
   function _recentRow(b) {
