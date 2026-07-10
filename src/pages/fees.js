@@ -37,9 +37,9 @@ var FeesPage = (function () {
 
     /* Quick filter */
     html += '<div class="quick-filters" style="margin-bottom:var(--sp-4);">';
-    html += '<button class="quick-filter' + (_filterFee === '' ? ' active' : '') + '" onclick="FeesPage.setFilter(\'\')">全部 (' + monthBookings.length + ')</button>';
-    html += '<button class="quick-filter' + (_filterFee === 'free' ? ' active' : '') + '" onclick="FeesPage.setFilter(\'free\')">免費 (' + feeCounts.free + ')</button>';
-    html += '<button class="quick-filter' + (_filterFee === 'paid' ? ' active' : '') + '" onclick="FeesPage.setFilter(\'paid\')">收費 (' + feeCounts.paid + ')</button>';
+    html += '<button class="quick-filter-btn' + (_filterFee === '' ? ' active' : '') + '" onclick="FeesPage.setFilter(\'\')">全部 (' + monthBookings.length + ')</button>';
+    html += '<button class="quick-filter-btn' + (_filterFee === 'free' ? ' active' : '') + '" onclick="FeesPage.setFilter(\'free\')">免費 (' + feeCounts.free + ')</button>';
+    html += '<button class="quick-filter-btn' + (_filterFee === 'paid' ? ' active' : '') + '" onclick="FeesPage.setFilter(\'paid\')">收費 (' + feeCounts.paid + ')</button>';
     html += '</div>';
 
     /* Fee table */
@@ -126,7 +126,7 @@ var FeesPage = (function () {
     if (rules.canEdit) {
       html += '<input type="number" min="0" step="1" class="fee-input" value="' + volWan + '" ';
       html += 'onchange="FeesPage.updateVolume(this,\'' + Utils.escapeHtml(b._fbKey || '') + '\')" ';
-      html += 'placeholder="萬" style="width:60px;text-align:right;padding:2px 4px;font-size:var(--fs-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-primary);">';
+      html += 'placeholder="萬" style="width:60px;text-align:right;padding:2px 4px;font-size:var(--fs-sm);border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-primary);">';
     } else {
       html += (volWan || '<span style="color:var(--text-muted);">-</span>');
     }
@@ -147,7 +147,7 @@ var FeesPage = (function () {
       if (rules.canEdit) {
         html += '<input type="number" min="0" class="fee-input" value="' + (b.chargeGuest || 0) + '" ';
         html += 'onchange="FeesPage.updateChargeGuest(this,\'' + Utils.escapeHtml(b._fbKey || '') + '\')" ';
-        html += 'style="width:65px;text-align:right;padding:2px 4px;font-size:var(--fs-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-primary);">';
+        html += 'style="width:65px;text-align:right;padding:2px 4px;font-size:var(--fs-sm);border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-primary);">';
       } else {
         html += Utils.formatCurrency(b.chargeGuest, curr);
       }
@@ -190,7 +190,7 @@ var FeesPage = (function () {
   function _summaryRow(bookings) {
     var totals = _calcTotals(bookings);
 
-    var html = '<tr id="fee-summary-row" style="background:var(--bg-base);font-weight:700;border-top:2px solid var(--border-color);">';
+    var html = '<tr id="fee-summary-row" style="background:var(--bg-base);font-weight:700;border-top:2px solid var(--border-default);">';
     html += '<td colspan="4">合計</td>';
     html += '<td class="num-cell">' + totals.nights + '</td>';
     html += '<td></td>';
@@ -334,7 +334,7 @@ var FeesPage = (function () {
         if (rules.canEdit) {
           cgCell.innerHTML = '<input type="number" min="0" class="fee-input" value="' + (b.chargeGuest || 0) + '" ';
           cgCell.innerHTML += 'onchange="FeesPage.updateChargeGuest(this,\'' + fbKey + '\')" ';
-          cgCell.innerHTML += 'style="width:65px;text-align:right;padding:2px 4px;font-size:var(--fs-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-primary);">';
+          cgCell.innerHTML += 'style="width:65px;text-align:right;padding:2px 4px;font-size:var(--fs-sm);border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-primary);">';
         } else {
           cgCell.textContent = Utils.formatCurrency(b.chargeGuest, curr);
         }
@@ -409,7 +409,7 @@ var FeesPage = (function () {
     kpiGrid.innerHTML = _buildKPIs(monthBookings, feeCounts, feeStatsData);
 
     /* Also update filter buttons */
-    var filterButtons = document.querySelectorAll('.quick-filter');
+    var filterButtons = document.querySelectorAll('.quick-filter-btn');
     if (filterButtons.length >= 3) {
       filterButtons[0].textContent = '全部 (' + monthBookings.length + ')';
       filterButtons[1].textContent = '免費 (' + feeCounts.free + ')';

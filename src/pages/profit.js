@@ -38,9 +38,9 @@ var ProfitPage = (function () {
 
     /* Quick filter */
     html += '<div class="quick-filters" style="margin-bottom:var(--sp-4);">';
-    html += '<button class="quick-filter' + (_filterFee === '' ? ' active' : '') + '" onclick="ProfitPage.setFilter(\'\')">全部 (' + monthBookings.length + ')</button>';
-    html += '<button class="quick-filter' + (_filterFee === 'paid' ? ' active' : '') + '" onclick="ProfitPage.setFilter(\'paid\')">收費 (' + feeCounts.paid + ')</button>';
-    html += '<button class="quick-filter' + (_filterFee === 'free' ? ' active' : '') + '" onclick="ProfitPage.setFilter(\'free\')">免費 (' + feeCounts.free + ')</button>';
+    html += '<button class="quick-filter-btn' + (_filterFee === '' ? ' active' : '') + '" onclick="ProfitPage.setFilter(\'\')">全部 (' + monthBookings.length + ')</button>';
+    html += '<button class="quick-filter-btn' + (_filterFee === 'paid' ? ' active' : '') + '" onclick="ProfitPage.setFilter(\'paid\')">收費 (' + feeCounts.paid + ')</button>';
+    html += '<button class="quick-filter-btn' + (_filterFee === 'free' ? ' active' : '') + '" onclick="ProfitPage.setFilter(\'free\')">免費 (' + feeCounts.free + ')</button>';
     html += '</div>';
 
     /* Profit table */
@@ -123,7 +123,7 @@ var ProfitPage = (function () {
       if (rules.canEdit) {
         html += '<input type="number" min="0" class="fee-input" value="' + chargeCompany + '" ';
         html += 'onchange="ProfitPage.updateChargeCompany(this,\'' + Utils.escapeHtml(b._fbKey || '') + '\')" ';
-        html += 'style="width:70px;text-align:right;padding:2px 4px;font-size:var(--fs-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-primary);">';
+        html += 'style="width:70px;text-align:right;padding:2px 4px;font-size:var(--fs-sm);border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-primary);">';
       } else {
         html += Utils.formatCurrency(chargeCompany, curr);
       }
@@ -153,7 +153,7 @@ var ProfitPage = (function () {
   function _summaryRow(bookings) {
     var totals = _calcTotals(bookings);
 
-    var html = '<tr id="profit-summary-row" style="background:var(--bg-base);font-weight:700;border-top:2px solid var(--border-color);">';
+    var html = '<tr id="profit-summary-row" style="background:var(--bg-base);font-weight:700;border-top:2px solid var(--border-default);">';
     html += '<td colspan="3">合計</td>';
     html += '<td class="num-cell">' + Utils.formatCurrency(totals.chargeGuest, CURRENCY_DEFAULT) + '</td>';
     html += '<td class="num-cell">' + Utils.formatCurrency(totals.chargeCompany, CURRENCY_DEFAULT) + '</td>';
@@ -261,7 +261,7 @@ var ProfitPage = (function () {
     kpiGrid.innerHTML = _buildKPIs(monthBookings, feeCounts, feeStatsData);
 
     /* Also update filter buttons */
-    var filterButtons = document.querySelectorAll('.quick-filter');
+    var filterButtons = document.querySelectorAll('.quick-filter-btn');
     if (filterButtons.length >= 3) {
       filterButtons[0].textContent = '全部 (' + monthBookings.length + ')';
       filterButtons[1].textContent = '收費 (' + feeCounts.paid + ')';
