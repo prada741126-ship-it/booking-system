@@ -132,6 +132,11 @@ function build() {
 
   /* App init script (runs after DOM ready) */
   jsContent += '\n<!-- ===== App Init ===== -->\n<script>\n';
+
+  /* Inject build version timestamp for cache-busting auto-refresh */
+  var buildTs = Date.now();
+  jsContent += 'window.BUILD_VERSION = "' + buildTs + '";\n';
+
   jsContent += 'document.addEventListener("DOMContentLoaded", function() {\n';
   jsContent += '  if (typeof Auth !== "undefined" && Auth.isLoggedIn()) {\n';
   jsContent += '    var overlay = document.getElementById("login-overlay");\n';
@@ -141,6 +146,28 @@ function build() {
   jsContent += '  var pwdInput = document.getElementById("login-password");\n';
   jsContent += '  if (pwdInput) pwdInput.focus();\n';
   jsContent += '});\n';
+
+  /* Auto version check: fetch latest HTML (bypass cache), compare BUILD_VERSION, auto-reload if newer */
+  jsContent += '/* Auto version check — bypass CDN cache */\n';
+  jsContent += '(function(){\n';
+  jsContent += '  if (sessionStorage.getItem("_vc")) return;\n';
+  jsContent += '  sessionStorage.setItem("_vc","1");\n';
+  jsContent += '  setTimeout(function(){\n';
+  jsContent += '    try {\n';
+  jsContent += '      fetch(window.location.href.split("?")[0] + "?_cb=" + Date.now(), {cache:"no-store"})\n';
+  jsContent += '        .then(function(r){return r.text();})\n';
+  jsContent += '        .then(function(html){\n';
+  jsContent += '          var m = html.match(/BUILD_VERSION\\s*=\\s*["\']([0-9]+)["\']/);\n';
+  jsContent += '          if (m && m[1] !== String(window.BUILD_VERSION)) {\n';
+  jsContent += '            console.log("[Cache] New version detected: " + m[1] + " vs current " + window.BUILD_VERSION + ". Reloading...");\n';
+  jsContent += '            window.location.reload();\n';
+  jsContent += '          }\n';
+  jsContent += '        })\n';
+  jsContent += '        .catch(function(){});\n';
+  jsContent += '    } catch(e) {}\n';
+  jsContent += '  }, 2000);\n';
+  jsContent += '})();\n';
+
   jsContent += '</script>\n';
 
   html = html.split('<!-- {{JS}} -->').join(jsContent);
