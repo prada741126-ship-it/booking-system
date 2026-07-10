@@ -106,7 +106,8 @@ var Toast = (function () {
     error: error,
     warning: warning,
     info: info,
-    clear: clear
+    clear: clear,
+    init: function () { /* no-op: container auto-created on first use */ }
   };
 })();
 
