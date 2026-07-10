@@ -1,6 +1,6 @@
 /**
  * fees.js — Fee Collection Page (Ctrl+3)
- * Booking System v2.0.7
+ * Booking System v2.0.8
  * Accountant fills volume → auto-calc discount/remaining → auto-determine fee status → fill charge amount
  * Silent save: updates DOM in-place without full page re-render
  */
@@ -133,7 +133,7 @@ var FeesPage = (function () {
     html += '</td>';
 
     /* Discount */
-    html += '<td class="num-cell cell-disc">' + (discountDays === 0 ? '<span style="color:var(--text-muted);">不足1</span>' : discountDays) + '</td>';
+    html += '<td class="num-cell cell-disc">' + (discountDays === 0 ? '<span style="color:var(--text-muted);">0</span>' : discountDays) + '</td>';
 
     /* Remaining */
     html += '<td class="num-cell cell-rem">' + _remainingHTML(remaining) + '</td>';
@@ -289,7 +289,7 @@ var FeesPage = (function () {
     /* Update discount cell */
     var discCell = tr.querySelector('.cell-disc');
     if (discCell) {
-      discCell.innerHTML = discountDays === 0 ? '<span style="color:var(--text-muted);">不足1</span>' : discountDays;
+      discCell.innerHTML = discountDays === 0 ? '<span style="color:var(--text-muted);">0</span>' : discountDays;
     }
 
     /* Update remaining cell */
