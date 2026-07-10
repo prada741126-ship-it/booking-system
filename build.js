@@ -345,16 +345,16 @@ function runTests() {
     assert(tpl.indexOf('#f0f2f5') !== -1, 'Should use light theme-color #f0f2f5');
   });
 
-  test('Template version label is v2.0.8', function () {
+  test('Template version label is v2.0.9', function () {
     var tpl = readFile(TEMPLATE);
-    assert(tpl.indexOf('v2.0.8') !== -1, 'Version label should be v2.0.8');
+    assert(tpl.indexOf('v2.0.9') !== -1, 'Version label should be v2.0.9');
   });
 
   /* ===== Test: constants.js defines required constants ===== */
   test('constants.js defines APP', function () {
     var src = getSrc('src/core/constants.js');
     assert(src.indexOf('var APP') !== -1, 'Missing APP');
-    assert(src.indexOf("VERSION: '2.0.8'") !== -1, 'APP.VERSION should be 2.0.8');
+    assert(src.indexOf("VERSION: '2.0.9'") !== -1, 'APP.VERSION should be 2.0.9');
   });
 
   test('constants.js defines CONFIG with v8 settings', function () {
@@ -731,7 +731,6 @@ function runTests() {
     assert(src.indexOf('bk-feeStatus') !== -1, 'Missing bk-feeStatus field');
     assert(src.indexOf('bk-currency') !== -1, 'Missing bk-currency field');
     assert(src.indexOf('bk-chargeGuest') !== -1, 'Missing bk-chargeGuest field');
-    assert(src.indexOf('bk-chargeCompany') !== -1, 'Missing bk-chargeCompany field');
     assert(src.indexOf('bk-pickupName') !== -1, 'Missing bk-pickupName field');
   });
 

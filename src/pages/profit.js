@@ -1,12 +1,13 @@
 /**
  * profit.js — Profit Settlement Page (Ctrl+2)
- * Booking System v2.0.0 (v8 spec)
- * Renders: KPI (profit/chargeGuest/chargeCompany) + profit by agent + profit by casino + by currency + detail table
+ * Booking System v2.0.9
+ * Accountant fills chargeCompany -> auto-calc profit = chargeGuest - chargeCompany
+ * Only shows paid bookings (free bookings shown grayed out without input)
+ * Silent save: updates DOM in-place without full page re-render
  */
 var ProfitPage = (function () {
 
-  var _sortField = 'profit';
-  var _sortAsc = false;
+  var _filterFee = '';  /* '', 'free', 'paid' */
 
   function render() {
     var container = document.getElementById('page-profit');
@@ -14,9 +15,8 @@ var ProfitPage = (function () {
 
     var month = State.get('workingMonth') || Utils.currentMonth();
     var monthBookings = Filters.filterBookings(Bookings.getAll(), { month: month });
-    var paidBookings = monthBookings.filter(function (b) {
-      return b.feeStatus === FEE_TYPES.PAID;
-    });
+    var feeCounts = Stats.countByFeeStatus(monthBookings);
+    var feeStatsData = Stats.feeStats(monthBookings);
 
     var html = '';
 
@@ -32,179 +32,249 @@ var ProfitPage = (function () {
     html += '</div>';
 
     /* KPI Cards */
-    var totalProfit = Stats.totalProfit(paidBookings);
-    var totalGuest = Stats.totalChargeGuest(paidBookings);
-    var totalCompany = Stats.totalChargeCompany(paidBookings);
-
-    html += '<div class="kpi-grid">';
-    html += _kpiCard('kpi-amber', '總利潤', Utils.formatCurrency(totalProfit, CURRENCY_DEFAULT), '', '向客人收 - 交公司',
-      '<svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>');
-    html += _kpiCard('kpi-blue', '向客人收', Utils.formatCurrency(totalGuest, CURRENCY_DEFAULT), '', '收費房合計',
-      '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>');
-    html += _kpiCard('kpi-green', '交公司', Utils.formatCurrency(totalCompany, CURRENCY_DEFAULT), '', '交賭場合計',
-      '<svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>');
-    html += _kpiCard('kpi-gold', '收費房數', paidBookings.length, '間', '本月收費訂房',
-      '<svg viewBox="0 0 24 24"><path d="M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z"/></svg>');
+    html += '<div class="kpi-grid" id="profit-kpi-grid">';
+    html += _buildKPIs(monthBookings, feeCounts, feeStatsData);
     html += '</div>';
 
-    /* Profit by currency (important: don't mix currencies) */
-    var byCurrency = Stats.chargeByCurrency(paidBookings);
-    var currencyKeys = Object.keys(byCurrency);
-    if (currencyKeys.length > 0) {
-      html += '<div class="card" style="margin-bottom:var(--sp-4);">';
-      html += '  <div class="card-title"><div class="card-icon"><svg viewBox="0 0 24 24"><path d="M7 15h2v2H7zm0 4h2v-2H7zm4-4h2v2h-2zm0 4h2v-2h-2zm4-4h2v2h-2zm0 4h2v-2h-2z"/><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z"/></svg></div>分幣別結算</div>';
+    /* Quick filter */
+    html += '<div class="quick-filters" style="margin-bottom:var(--sp-4);">';
+    html += '<button class="quick-filter' + (_filterFee === '' ? ' active' : '') + '" onclick="ProfitPage.setFilter(\'\')">全部 (' + monthBookings.length + ')</button>';
+    html += '<button class="quick-filter' + (_filterFee === 'paid' ? ' active' : '') + '" onclick="ProfitPage.setFilter(\'paid\')">收費 (' + feeCounts.paid + ')</button>';
+    html += '<button class="quick-filter' + (_filterFee === 'free' ? ' active' : '') + '" onclick="ProfitPage.setFilter(\'free\')">免費 (' + feeCounts.free + ')</button>';
+    html += '</div>';
+
+    /* Profit table */
+    var filtered = _filterFee ? monthBookings.filter(function (b) { return b.feeStatus === _filterFee; }) : monthBookings;
+    var sorted = _sortBookings(filtered);
+
+    html += '<div class="card">';
+    html += '  <div class="card-title"><div class="card-icon"><svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg></div>利潤明細</div>';
+
+    /* Formula hint */
+    html += '<div style="margin-bottom:var(--sp-2);color:var(--text-muted);font-size:var(--fs-xs);">';
+    html += '利潤 = 向客人收 − 交公司。免費房以灰色顯示，不需填入交公司金額。';
+    html += '</div>';
+
+    if (sorted.length === 0) {
+      html += _emptyStateMini('暫無記錄');
+    } else {
       html += '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint scrollable">';
       html += '<table class="data-table"><thead><tr>';
-      html += '<th>幣別</th><th class="num-cell">筆數</th><th class="num-cell">向客人收</th><th class="num-cell">交公司</th><th class="num-cell">利潤</th>';
-      html += '</tr></thead><tbody>';
-      for (var i = 0; i < currencyKeys.length; i++) {
-        var curr = currencyKeys[i];
-        var c = byCurrency[curr];
-        html += '<tr>';
-        html += '<td><span class="currency-badge">' + Utils.escapeHtml(curr) + '</span></td>';
-        html += '<td class="num-cell">' + c.count + '</td>';
-        html += '<td class="num-cell">' + Utils.formatCurrency(c.chargeGuest, curr) + '</td>';
-        html += '<td class="num-cell">' + Utils.formatCurrency(c.chargeCompany, curr) + '</td>';
-        html += '<td class="num-cell" style="font-weight:700;color:var(--color-warning);">' + Utils.formatCurrency(c.profit, curr) + '</td>';
-        html += '</tr>';
+      html += '<th>代理</th><th>客人</th><th>酒店</th>';
+      html += '<th style="text-align:right;width:90px;">向客人收</th>';
+      html += '<th style="text-align:right;width:90px;">交公司</th>';
+      html += '<th style="text-align:right;width:90px;">利潤</th>';
+      html += '<th style="width:50px;">幣別</th>';
+      html += '</tr></thead><tbody id="profit-table-body">';
+
+      for (var i = 0; i < sorted.length; i++) {
+        html += _profitRow(sorted[i]);
       }
+
+      /* Summary row */
+      html += _summaryRow(sorted);
+
       html += '</tbody></table></div></div>';
-      html += '</div>';
     }
-
-    /* Two columns: by agent + by casino */
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4);margin-bottom:var(--sp-4);">';
-
-    /* Profit by agent */
-    html += '<div class="card">';
-    html += '  <div class="card-title"><div class="card-icon"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>代理利潤</div>';
-    html += _profitByAgentTable(paidBookings);
-    html += '</div>';
-
-    /* Profit by casino */
-    html += '<div class="card">';
-    html += '  <div class="card-title"><div class="card-icon"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg></div>體系利潤</div>';
-    html += _profitByCasinoTable(paidBookings);
-    html += '</div>';
-
-    html += '</div>';
-
-    /* Detail table */
-    html += '<div class="card">';
-    html += '  <div class="card-title"><div class="card-icon"><svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg></div>收費明細</div>';
-    html += _detailTable(paidBookings);
     html += '</div>';
 
     container.innerHTML = html;
   }
 
-  function _profitByAgentTable(bookings) {
-    var map = Stats.profitByAgent(bookings);
-    var arr = [];
-    for (var name in map) {
-      arr.push({ agent: name, count: map[name].count, profit: map[name].profit, chargeGuest: map[name].chargeGuest, chargeCompany: map[name].chargeCompany });
-    }
-    arr.sort(function (a, b) { return b.profit - a.profit; });
-
-    if (arr.length === 0) return _emptyStateMini('暫無收費記錄');
-
-    var html = '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint scrollable">';
-    html += '<table class="data-table"><thead><tr><th>代理</th><th class="num-cell">筆</th><th class="num-cell">利潤</th></tr></thead><tbody>';
-    for (var i = 0; i < arr.length; i++) {
-      html += '<tr><td style="font-weight:600;">' + Utils.escapeHtml(arr[i].agent) + '</td>';
-      html += '<td class="num-cell">' + arr[i].count + '</td>';
-      html += '<td class="num-cell" style="font-weight:700;color:var(--color-warning);">' + Utils.formatCurrency(arr[i].profit, CURRENCY_DEFAULT) + '</td></tr>';
-    }
-    html += '</tbody></table></div></div>';
-    return html;
+  /* ===== Sort by agent first, then checkIn ===== */
+  function _sortBookings(bookings) {
+    return bookings.slice().sort(function (a, b) {
+      var agentA = (a.agent || '').toLowerCase();
+      var agentB = (b.agent || '').toLowerCase();
+      if (agentA !== agentB) return agentA < agentB ? -1 : 1;
+      return (a.checkIn || '') < (b.checkIn || '') ? -1 : 1;
+    });
   }
 
-  function _profitByCasinoTable(bookings) {
-    var map = Stats.profitByCasino(bookings);
-    var arr = [];
-    for (var name in map) {
-      arr.push({ casino: name, count: map[name].count, profit: map[name].profit });
-    }
-    arr.sort(function (a, b) { return b.profit - a.profit; });
+  /* ===== Row builder ===== */
+  function _profitRow(b) {
+    var curr = b.currency || CURRENCY_DEFAULT;
+    var isPaid = b.feeStatus === FEE_TYPES.PAID;
+    var rules = STATUS_RULES[b.status] || { canEdit: true };
+    var chargeGuest = Number(b.chargeGuest) || 0;
+    var chargeCompany = Number(b.chargeCompany) || 0;
+    var profit = chargeGuest - chargeCompany;
 
-    if (arr.length === 0) return _emptyStateMini('暫無收費記錄');
+    var html = '<tr data-fbkey="' + Utils.escapeHtml(b._fbKey || '') + '"'
+      + (isPaid ? '' : ' style="opacity:0.5;')
+      + '">';
 
-    var html = '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint scrollable">';
-    html += '<table class="data-table"><thead><tr><th>體系</th><th class="num-cell">筆</th><th class="num-cell">利潤</th></tr></thead><tbody>';
-    for (var i = 0; i < arr.length; i++) {
-      html += '<tr><td style="font-weight:600;">' + Utils.escapeHtml(arr[i].casino) + '</td>';
-      html += '<td class="num-cell">' + arr[i].count + '</td>';
-      html += '<td class="num-cell" style="font-weight:700;color:var(--color-warning);">' + Utils.formatCurrency(arr[i].profit, CURRENCY_DEFAULT) + '</td></tr>';
-    }
-    html += '</tbody></table></div></div>';
-    return html;
-  }
+    html += '<td style="font-weight:600;">' + Utils.escapeHtml(b.agent || '-') + '</td>';
+    html += '<td>' + Utils.escapeHtml(b.guestName || '-') + '</td>';
+    html += '<td style="font-size:var(--fs-sm);">' + Utils.escapeHtml(b.hotel || '-') + '</td>';
 
-  function _detailTable(bookings) {
-    if (bookings.length === 0) return _emptyStateMini('暫無收費記錄');
-
-    var sorted = Filters.sortBookings(bookings, _sortField, _sortAsc);
-
-    var html = '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint scrollable">';
-    html += '<table class="data-table"><thead><tr>';
-    html += _th('客人', 'guestName');
-    html += _th('代理', 'agent');
-    html += _th('體系', 'casino');
-    html += _th('入住', 'checkIn');
-    html += _th('晚', 'nights', 'num-cell');
-    html += _th('幣別', 'currency');
-    html += '<th class="num-cell">向客人收</th>';
-    html += '<th class="num-cell">交公司</th>';
-    html += '<th class="num-cell">利潤</th>';
-    html += '</tr></thead><tbody>';
-
-    for (var i = 0; i < sorted.length; i++) {
-      var b = sorted[i];
-      var curr = b.currency || CURRENCY_DEFAULT;
-      html += '<tr style="cursor:pointer;" onclick="viewBookingDetail(\'' + b._fbKey + '\')">';
-      html += '<td style="font-weight:600;">' + Utils.escapeHtml(b.guestName || '-') + '</td>';
-      html += '<td>' + Utils.escapeHtml(b.agent || '-') + '</td>';
-      html += '<td>' + Utils.escapeHtml(b.casino || '-') + '</td>';
-      html += '<td style="font-size:var(--fs-sm);">' + Utils.formatDateDisplay(b.checkIn) + '</td>';
-      html += '<td class="num-cell">' + (b.nights || 0) + '</td>';
-      html += '<td><span class="currency-badge">' + Utils.escapeHtml(curr) + '</span></td>';
-      html += '<td class="num-cell">' + Utils.formatCurrency(b.chargeGuest, curr) + '</td>';
-      html += '<td class="num-cell">' + Utils.formatCurrency(b.chargeCompany, curr) + '</td>';
-      html += '<td class="num-cell" style="font-weight:700;color:var(--color-warning);">' + Utils.formatCurrency(b.profit, curr) + '</td>';
-      html += '</tr>';
-    }
-
-    /* Totals row */
-    html += '<tr style="background:var(--bg-base);font-weight:700;"><td colspan="5">合計 ' + sorted.length + ' 筆</td>';
-    html += '<td></td>';
-    html += '<td class="num-cell">' + Utils.formatCurrency(Stats.totalChargeGuest(sorted), CURRENCY_DEFAULT) + '</td>';
-    html += '<td class="num-cell">' + Utils.formatCurrency(Stats.totalChargeCompany(sorted), CURRENCY_DEFAULT) + '</td>';
-    html += '<td class="num-cell" style="color:var(--color-warning);">' + Utils.formatCurrency(Stats.totalProfit(sorted), CURRENCY_DEFAULT) + '</td>';
-    html += '</tr>';
-
-    html += '</tbody></table></div></div>';
-    return html;
-  }
-
-  function _th(label, field, extraClass) {
-    var cls = extraClass || '';
-    var sortIcon = '';
-    if (field === _sortField) {
-      sortIcon = _sortAsc ? ' \u25B2' : ' \u25BC';
-    }
-    return '<th class="' + cls + '" style="cursor:pointer;" onclick="ProfitPage.sortBy(\'' + field + '\')">' + label + sortIcon + '</th>';
-  }
-
-  function sortBy(field) {
-    if (field === _sortField) {
-      _sortAsc = !_sortAsc;
+    /* Charge guest (read-only) */
+    html += '<td class="num-cell cell-cg">';
+    if (isPaid) {
+      html += Utils.formatCurrency(chargeGuest, curr);
     } else {
-      _sortField = field;
-      _sortAsc = true;
+      html += '<span style="color:var(--text-muted);">-</span>';
     }
+    html += '</td>';
+
+    /* Charge company (editable for paid bookings) */
+    html += '<td class="num-cell cell-cc">';
+    if (isPaid) {
+      if (rules.canEdit) {
+        html += '<input type="number" min="0" class="fee-input" value="' + chargeCompany + '" ';
+        html += 'onchange="ProfitPage.updateChargeCompany(this,\'' + Utils.escapeHtml(b._fbKey || '') + '\')" ';
+        html += 'style="width:70px;text-align:right;padding:2px 4px;font-size:var(--fs-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-primary);">';
+      } else {
+        html += Utils.formatCurrency(chargeCompany, curr);
+      }
+    } else {
+      html += '<span style="color:var(--text-muted);">-</span>';
+    }
+    html += '</td>';
+
+    /* Profit (auto-calculated) */
+    html += '<td class="num-cell cell-profit" style="font-weight:700;';
+    if (isPaid) {
+      html += profit > 0 ? 'color:var(--color-success);">' : profit < 0 ? 'color:var(--color-danger);">' : '">';
+      html += Utils.formatCurrency(profit, curr);
+    } else {
+      html += 'color:var(--text-muted);">-</span>';
+    }
+    html += '</td>';
+
+    /* Currency */
+    html += '<td style="font-size:var(--fs-sm);color:var(--text-muted);">' + Utils.escapeHtml(curr) + '</td>';
+
+    html += '</tr>';
+    return html;
+  }
+
+  /* ===== Summary row ===== */
+  function _summaryRow(bookings) {
+    var totals = _calcTotals(bookings);
+
+    var html = '<tr id="profit-summary-row" style="background:var(--bg-base);font-weight:700;border-top:2px solid var(--border-color);">';
+    html += '<td colspan="3">合計</td>';
+    html += '<td class="num-cell">' + Utils.formatCurrency(totals.chargeGuest, CURRENCY_DEFAULT) + '</td>';
+    html += '<td class="num-cell">' + Utils.formatCurrency(totals.chargeCompany, CURRENCY_DEFAULT) + '</td>';
+    html += '<td class="num-cell" style="color:' + (totals.profit >= 0 ? 'var(--color-success)' : 'var(--color-danger)') + ';">' + Utils.formatCurrency(totals.profit, CURRENCY_DEFAULT) + '</td>';
+    html += '<td></td>';
+    html += '</tr>';
+    return html;
+  }
+
+  function _calcTotals(bookings) {
+    var chargeGuest = 0, chargeCompany = 0, profit = 0;
+    for (var i = 0; i < bookings.length; i++) {
+      var b = bookings[i];
+      if (b.feeStatus === 'paid') {
+        chargeGuest += Number(b.chargeGuest) || 0;
+        chargeCompany += Number(b.chargeCompany) || 0;
+        profit += (Number(b.chargeGuest) || 0) - (Number(b.chargeCompany) || 0);
+      }
+    }
+    return { chargeGuest: chargeGuest, chargeCompany: chargeCompany, profit: profit };
+  }
+
+  function _buildKPIs(monthBookings, feeCounts, feeStatsData) {
+    var html = '';
+    html += _kpiCard('kpi-amber', '收費房', feeCounts.paid, '間', '需填入交公司金額',
+      '<svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>');
+    if (feeStatsData.paid.count > 0) {
+      html += _kpiCard('kpi-blue', '向客人收合計', Utils.formatCurrency(feeStatsData.paid.chargeGuest, CURRENCY_DEFAULT), '', '收費房',
+        '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>');
+      html += _kpiCard('kpi-gold', '交公司合計', Utils.formatCurrency(feeStatsData.paid.chargeCompany, CURRENCY_DEFAULT), '', '收費房',
+        '<svg viewBox="0 0 24 24"><path d="M19 14V6c0-1.1-.9-2-2-2H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zm-9-1.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>');
+      var totalProfit = feeStatsData.paid.chargeGuest - feeStatsData.paid.chargeCompany;
+      html += _kpiCard(totalProfit >= 0 ? 'kpi-green' : 'kpi-amber', '利潤合計', Utils.formatCurrency(totalProfit, CURRENCY_DEFAULT), '', '客人收 - 公司',
+        '<svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>');
+    }
+    return html;
+  }
+
+  /* ===== Silent update: chargeCompany ===== */
+  function updateChargeCompany(inputEl, fbKey) {
+    try {
+      var num = Number(inputEl.value) || 0;
+      var updated = Bookings.update(fbKey, { chargeCompany: num });
+      if (updated) {
+        /* Update profit cell in-place */
+        var tr = inputEl.closest('tr');
+        if (tr) {
+          var profitCell = tr.querySelector('.cell-profit');
+          if (profitCell) {
+            var curr = updated.currency || CURRENCY_DEFAULT;
+            var chargeGuest = Number(updated.chargeGuest) || 0;
+            var chargeCompany = Number(updated.chargeCompany) || 0;
+            var profit = chargeGuest - chargeCompany;
+            profitCell.style.fontWeight = '700';
+            profitCell.style.color = profit > 0 ? 'var(--color-success)' : profit < 0 ? 'var(--color-danger)' : '';
+            profitCell.textContent = Utils.formatCurrency(profit, curr);
+          }
+        }
+        _updateSummary();
+        _updateKPIs();
+      }
+    } catch (e) {
+      console.error('[ProfitPage] updateChargeCompany error:', e);
+      Toast.show('更新失敗', 'error');
+    }
+  }
+
+  /* ===== Update summary row in-place ===== */
+  function _updateSummary() {
+    var tbody = document.getElementById('profit-table-body');
+    if (!tbody) return;
+    var summaryRow = document.getElementById('profit-summary-row');
+    if (!summaryRow) return;
+
+    /* Recalculate from all visible booking rows */
+    var dataRows = tbody.querySelectorAll('tr[data-fbkey]');
+    var totals = { chargeGuest: 0, chargeCompany: 0, profit: 0 };
+
+    for (var i = 0; i < dataRows.length; i++) {
+      var fbKey = dataRows[i].getAttribute('data-fbkey');
+      var b = Bookings.getByKey(fbKey);
+      if (!b) continue;
+      if (b.feeStatus === 'paid') {
+        totals.chargeGuest += Number(b.chargeGuest) || 0;
+        totals.chargeCompany += Number(b.chargeCompany) || 0;
+        totals.profit += (Number(b.chargeGuest) || 0) - (Number(b.chargeCompany) || 0);
+      }
+    }
+
+    summaryRow.innerHTML = '<td colspan="3">合計</td>';
+    summaryRow.innerHTML += '<td class="num-cell">' + Utils.formatCurrency(totals.chargeGuest, CURRENCY_DEFAULT) + '</td>';
+    summaryRow.innerHTML += '<td class="num-cell">' + Utils.formatCurrency(totals.chargeCompany, CURRENCY_DEFAULT) + '</td>';
+    summaryRow.innerHTML += '<td class="num-cell" style="color:' + (totals.profit >= 0 ? 'var(--color-success)' : 'var(--color-danger)') + ';">' + Utils.formatCurrency(totals.profit, CURRENCY_DEFAULT) + '</td>';
+    summaryRow.innerHTML += '<td></td>';
+  }
+
+  /* ===== Update KPI cards in-place ===== */
+  function _updateKPIs() {
+    var kpiGrid = document.getElementById('profit-kpi-grid');
+    if (!kpiGrid) return;
+    var month = State.get('workingMonth') || Utils.currentMonth();
+    var monthBookings = Filters.filterBookings(Bookings.getAll(), { month: month });
+    var feeCounts = Stats.countByFeeStatus(monthBookings);
+    var feeStatsData = Stats.feeStats(monthBookings);
+    kpiGrid.innerHTML = _buildKPIs(monthBookings, feeCounts, feeStatsData);
+
+    /* Also update filter buttons */
+    var filterButtons = document.querySelectorAll('.quick-filter');
+    if (filterButtons.length >= 3) {
+      filterButtons[0].textContent = '全部 (' + monthBookings.length + ')';
+      filterButtons[1].textContent = '收費 (' + feeCounts.paid + ')';
+      filterButtons[2].textContent = '免費 (' + feeCounts.free + ')';
+    }
+  }
+
+  function setFilter(fee) {
+    _filterFee = fee;
     render();
   }
 
+  /* ===== Private helpers ===== */
   function _kpiCard(colorClass, label, value, unit, sub, iconSvg) {
     var html = '<div class="kpi-card ' + colorClass + '">';
     html += '  <div class="kpi-header"><span class="kpi-label">' + Utils.escapeHtml(label) + '</span><div class="kpi-icon">' + iconSvg + '</div></div>';
@@ -226,7 +296,8 @@ var ProfitPage = (function () {
 
   return {
     render: render,
-    sortBy: sortBy
+    updateChargeCompany: updateChargeCompany,
+    setFilter: setFilter
   };
 })();
 

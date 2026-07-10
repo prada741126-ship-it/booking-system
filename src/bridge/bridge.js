@@ -38,7 +38,7 @@ function closeSidebar() {
  * Booking Modal — Create / Edit / View / Delete
  * v8 fields: guestName, agent, employee, casino, hotel, roomType,
  *            checkIn, checkOut, smoking, feeStatus, currency,
- *            chargeGuest, chargeCompany, transfer, pickupName, remark
+ *            chargeGuest, transfer, pickupName, remark
  * ============================================================ */
 
 var _editingBookingKey = null;
@@ -102,9 +102,8 @@ function openBookingModal(presetDate) {
   body += '    </select></div>';
   body += '</div>';
 
-  body += '<div class="form-row-3" id="bk-fee-row" style="display:none;">';
+  body += '<div class="form-row" id="bk-fee-row" style="display:none;">';
   body += '  <div class="form-group"><label>' + Utils.escapeHtml(TERMS.chargeGuest) + '</label><input type="number" class="form-control" id="bk-chargeGuest" value="0" min="0"></div>';
-  body += '  <div class="form-group"><label>' + Utils.escapeHtml(TERMS.chargeCompany) + '</label><input type="number" class="form-control" id="bk-chargeCompany" value="0" min="0"></div>';
   body += '  <div class="form-group"><label>' + Utils.escapeHtml(TERMS.threshold) + '（萬）</label><input type="number" class="form-control" id="bk-threshold" value="0" readonly style="opacity:0.6;"></div>';
   body += '</div>';
 
@@ -222,8 +221,7 @@ function saveBookingForm() {
 
   /* Only include fee amounts if paid */
   if (data.feeStatus === 'paid') {
-    data.chargeGuest   = Number(document.getElementById('bk-chargeGuest').value) || 0;
-    data.chargeCompany = Number(document.getElementById('bk-chargeCompany').value) || 0;
+    data.chargeGuest = Number(document.getElementById('bk-chargeGuest').value) || 0;
   }
 
   /* Get threshold from hidden field */
@@ -291,7 +289,6 @@ function editBooking(fbKey) {
     document.getElementById('bk-currency').value = booking.currency || 'HKD';
     if (booking.feeStatus === 'paid') {
       document.getElementById('bk-chargeGuest').value = booking.chargeGuest || 0;
-      document.getElementById('bk-chargeCompany').value = booking.chargeCompany || 0;
     }
     document.getElementById('bk-transfer').value = booking.transfer || 'none';
     document.getElementById('bk-pickupName').value = booking.pickupName || '';
@@ -321,7 +318,6 @@ function viewBookingDetail(fbKey) {
   body += _detailField(TERMS.feeType, FEE_TYPE_LABELS[b.feeStatus] || b.feeStatus);
   body += _detailField(TERMS.currency, b.currency || 'HKD');
   body += _detailField(TERMS.chargeGuest, b.feeStatus === 'paid' ? Utils.formatCurrency(b.chargeGuest, b.currency) : '--');
-  body += _detailField(TERMS.chargeCompany, b.feeStatus === 'paid' ? Utils.formatCurrency(b.chargeCompany, b.currency) : '--');
   body += _detailField(TERMS.profit, b.feeStatus === 'paid' ? Utils.formatCurrency(b.profit, b.currency) : '--');
   body += _detailField(TERMS.threshold, Utils.formatNumber(Math.round((b.threshold || 0) / 10000)) + ' 萬');
   body += _detailField(TERMS.transfer, _transferLabel(b.transfer));
