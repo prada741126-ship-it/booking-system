@@ -27,8 +27,14 @@ var crypto = require('crypto');
  * Configuration
  * ============================================================ */
 
+/* Try loading config file if env var not set */
+var _botToken = process.env.TELEGRAM_BOT_TOKEN || '';
+if (!_botToken) {
+  try { _botToken = require('./config').TELEGRAM_BOT_TOKEN || ''; } catch (e) { /* config.js not found */ }
+}
+
 var CONFIG = {
-  TELEGRAM_TOKEN: process.env.TELEGRAM_BOT_TOKEN || '',
+  TELEGRAM_TOKEN: _botToken,
 
   FIREBASE: {
     DB_URL: 'https://macau-app-default-rtdb.asia-southeast1.firebasedatabase.app',
@@ -67,6 +73,8 @@ var ROOM_TYPES = [
   { value: 'two-bedroom',   label: '二房一厅' },
   { value: 'three-bedroom', label: '三房一厅' }
 ];
+
+var botUsername = null; /* Set from getMe on startup */
 
 var CASINO_ORDER = ['新濠天地', '新濠影汇', '金沙', '银河', '永利', '上葡京'];
 
@@ -2283,6 +2291,30 @@ function handleCallback(cb) {
   });
 }
 
+/* Check if a message @mentions this bot */
+function isBotMentioned(msg) {
+  if (!msg || !botUsername) return false;
+
+  /* Check entities for mention type pointing to our bot */
+  var entities = msg.entities;
+  if (entities && entities.length > 0) {
+    var text = msg.text || msg.caption || '';
+    for (var i = 0; i < entities.length; i++) {
+      var e = entities[i];
+      if (e.type === 'mention') {
+        var mentioned = text.substring(e.offset, e.offset + e.length);
+        if (mentioned === '@' + botUsername) return true;
+      }
+    }
+  }
+
+  /* Fallback: check text for @botname (in case entities not sent) */
+  var raw = msg.text || msg.caption || '';
+  if (raw.indexOf('@' + botUsername) !== -1) return true;
+
+  return false;
+}
+
 /* ============================================================
  * Text Message Handler
  * ============================================================ */
@@ -2362,13 +2394,32 @@ function handleText(msg) {
     return;
   }
 
-  /* Not a command — check if in a session */
+  /* Not a command — handle based on chat type */
+  var chatType = msg.chat.type;
+  var mentioned = isBotMentioned(msg);
+  var isGroup = (chatType === 'group' || chatType === 'supergroup');
+
   checkAuth(msg, function (ok) {
     if (!ok) return;
 
     var session = getSession(userId);
+
+    /* In groups: ignore non-mention messages (unless user is in a session) */
+    if (isGroup && !mentioned && !session) {
+      /* Don't respond — avoid noise in group chats */
+      return;
+    }
+
+    /* In groups with @mention or in private chat: show main menu */
     if (!session) {
-      sendMessage(chatId, '请使用下方命令或菜单操作。\n输入 /help 查看说明。', mainMenuKB(getEmployeeByTgId(userId)));
+      var emp = getEmployeeByTgId(userId);
+      var name = emp ? emp.name : getDisplayName(msg.from);
+      var roleLabel = (emp && emp.role === EMPLOYEE_ROLES.ADMIN) ? ' 🔑管理员' : '';
+
+      var greet = '👋 您好，<b>' + escapeHtml(name) + '</b>' + roleLabel + '\n\n';
+      greet += '请选择以下操作：';
+
+      sendMessage(chatId, greet, mainMenuKB(emp));
       return;
     }
 
@@ -2816,7 +2867,8 @@ function start() {
       process.exit(1);
     }
 
-    console.log('[Bot] Connected as @' + result.username + ' (' + result.first_name + ')');
+    botUsername = result.username;
+    console.log('[Bot] Connected as @' + botUsername + ' (' + result.first_name + ')');
     console.log('[Bot] Bot ID: ' + result.id);
     console.log('');
 
