@@ -2489,7 +2489,8 @@ function handleText(msg) {
         break;
 
       default:
-        sendMessage(chatId, '请使用下方按钮操作，或输入 /取消 退出。');
+        var emp2 = getEmployeeByTgId(userId);
+        sendMessage(chatId, '👋 操作菜单：', mainMenuKB(emp2));
         break;
     }
   });
