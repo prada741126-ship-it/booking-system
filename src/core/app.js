@@ -85,11 +85,20 @@ var App = (function () {
   function initAgentList() {
     var list = State.get('agentList');
     if (!list || list.length === 0) {
-      console.log('[App] Agent list empty, loading default agents...');
-      var defaults = ['王大帥', 'Fifi', 'Ring', 'Yuka', '安', '韓國'];
-      for (var i = 0; i < defaults.length; i++) {
-        Agents.add(defaults[i]);
+      console.log('[App] Agent list empty - user will add agents manually or via sync');
+      return;
+    }
+    /* Clean up any duplicates that may have accumulated from old sync issues */
+    try {
+      var cleaned = Agents.deduplicate ? Agents.deduplicate() : list;
+      if (cleaned && cleaned.length !== list.length) {
+        console.log('[App] Cleaned duplicate agents:', list.length, '->', cleaned.length);
+        State.set('agentList', cleaned);
+        Store.saveAgentList(cleaned);
+        syncAgentListToFirebase(cleaned);
       }
+    } catch (e) {
+      console.error('[App] Agent deduplication error:', e);
     }
   }
 

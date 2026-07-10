@@ -173,5 +173,37 @@ var Agents = {
    */
   getAll: function () {
     return State.get('agentList');
+  },
+
+  /**
+   * Deduplicate agents by name (keep the newest _updatedAt)
+   * Returns the deduplicated list (does NOT mutate state)
+   */
+  deduplicate: function () {
+    var list = State.get('agentList') || [];
+    var nameMap = {};
+    for (var i = 0; i < list.length; i++) {
+      var agent = list[i];
+      var nameKey = (agent.name || '').toLowerCase().trim();
+      if (!nameKey) continue;
+      var existing = nameMap[nameKey];
+      if (!existing) {
+        nameMap[nameKey] = agent;
+      } else {
+        var existingTs = existing._updatedAt || 0;
+        var agentTs = agent._updatedAt || 0;
+        if (agentTs > existingTs) {
+          nameMap[nameKey] = agent;
+        }
+      }
+    }
+    var result = [];
+    for (var key in nameMap) {
+      if (nameMap.hasOwnProperty(key)) {
+        result.push(nameMap[key]);
+      }
+    }
+    console.log('[Agents] Deduplicated:', list.length, '->', result.length);
+    return result;
   }
 };

@@ -104,6 +104,30 @@ var Merger = {
       }
     }
 
+    /* Second pass: deduplicate by name (case-insensitive) */
+    var nameMap = {};
+    for (var m = 0; m < merged.length; m++) {
+      var agent = merged[m];
+      var nameKey = (agent.name || '').toLowerCase().trim();
+      if (!nameKey) continue;
+      var existing = nameMap[nameKey];
+      if (!existing) {
+        nameMap[nameKey] = agent;
+      } else {
+        var existingTs = existing._updatedAt || 0;
+        var agentTs = agent._updatedAt || 0;
+        if (agentTs > existingTs) {
+          nameMap[nameKey] = agent;
+        }
+      }
+    }
+    merged = [];
+    for (var nKey in nameMap) {
+      if (nameMap.hasOwnProperty(nKey)) {
+        merged.push(nameMap[nKey]);
+      }
+    }
+
     return merged;
   },
 

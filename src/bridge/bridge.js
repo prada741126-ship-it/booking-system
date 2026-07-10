@@ -401,7 +401,7 @@ function openAgentModal() {
   if (agents.length === 0) {
     body += '<div class="empty-state"><div class="empty-title">\u66ab\u7121\u4ee3\u7406</div><div class="empty-desc">\u9ede\u64ca\u4e0b\u65b9\u6309\u9215\u65b0\u589e\u4ee3\u7406</div></div>';
   } else {
-    body += '<div class="data-table-wrap"><div class="data-table-scroll"><table class="data-table"><thead><tr><th>\u4ee3\u7406\u540d\u7a31</th><th>\u72c0\u614b</th><th>\u64cd\u4f5c</th></tr></thead><tbody>';
+    body += '<div class="data-table-wrap" style="max-height: 50vh; overflow-y: auto;"><div class="data-table-scroll"><table class="data-table"><thead style="position:sticky;top:0;background:var(--bg-surface);z-index:1;"><tr><th>\u4ee3\u7406\u540d\u7a31</th><th>\u72c0\u614b</th><th style="min-width:120px;">\u64cd\u4f5c</th></tr></thead><tbody>';
     for (var i = 0; i < agents.length; i++) {
       var a = agents[i];
       var name = a.name || '';
@@ -430,7 +430,7 @@ function openAgentModal() {
   Modal.open({
     title: '\u4ee3\u7406\u540d\u55ae\u7ba1\u7406',
     body: body,
-    size: 'md'
+    size: 'lg'
   });
 }
 
