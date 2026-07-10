@@ -211,7 +211,7 @@ var AgentPerfPage = (function () {
       if (vol > 0 && th > 0) {
         discountDays = Math.floor(vol / th);
       }
-      var discountLabel = (vol > 0 && discountDays === 0) ? '不足1' : (vol > 0 ? discountDays : '-');
+      var discountLabel = (vol > 0 && discountDays === 0) ? '0' : (vol > 0 ? discountDays : '-');
 
       var remaining = n - discountDays;
       var remainingLabel, remainingStyle;
