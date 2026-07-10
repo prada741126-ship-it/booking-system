@@ -203,7 +203,7 @@ function setBotCommands() {
   var commands = [
     { command: 'newauth',   description: '管理员授权新员工 [管理员]' },
     { command: 'book',      description: '开始订房流程' },
-    { command: 'confirmno', description: '填入确认编号' },
+    { command: 'confirmno', description: '填入确认编号（支持批量粘贴）' },
     { command: 'modify',    description: '修改订房资料' },
     { command: 'cancel',    description: '取消订房' },
     { command: 'query',     description: '查询订房记录' }
@@ -706,6 +706,168 @@ function parseBookingText(text) {
   return result;
 }
 
+/**
+ * Parse bulk confirmation numbers from PR reply text.
+ * Handles formats like:
+ *   31082710  Huang Yi Lun
+ *   31082711  Chang yin ting
+ *   31082712  Chien Yu Ju
+ *
+ * Also handles: mixed alphanumeric, different spacing, forwarded messages.
+ * Returns array of { confirmNo, name } objects.
+ */
+function parseBulkConfirmNumbers(text) {
+  if (!text) return [];
+  var lines = text.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l; });
+  var results = [];
+
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    /* Skip lines that look like headers or labels */
+    if (line.match(/登记人|入住|退房|酒店|备注|确认|booking|check/i)) continue;
+
+    /* Try to extract confirm number and name */
+    /* Pattern: confirmNo (8-12 chars alphanumeric/digits) followed by name */
+    var match = line.match(/^([A-Za-z0-9]{6,14})\s+(.+)$/);
+    if (!match) {
+      /* Alternative: number anywhere in line, name after it */
+      match = line.match(/\b([A-Za-z0-9]{6,14})\b.*\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/i);
+      if (match) {
+        results.push({ confirmNo: match[1], name: match[2].trim() });
+      }
+      continue;
+    }
+
+    var confirmNo = match[1];
+    var rest = match[2].trim();
+
+    /* Extract name from rest — look for English/Chinese name */
+    var nameMatch = rest.match(/([A-Za-z\u4e00-\u9fa5][A-Za-z\s,\-]*[A-Za-z])/);
+    var name = nameMatch ? nameMatch[1].trim() : rest;
+
+    /* Validate confirmNo: should contain mostly digits or be alphanumeric */
+    if (/^[A-Za-z]+$/.test(confirmNo)) continue; /* Skip pure letters */
+    if (confirmNo.length < 6) continue;
+
+    results.push({ confirmNo: confirmNo, name: name });
+  }
+
+  return results;
+}
+
+/**
+ * Normalize a name for fuzzy matching (lowercase, remove punctuation and spaces).
+ */
+function normalizeName(name) {
+  if (!name) return '';
+  return String(name)
+    .toLowerCase()
+    .replace(/[,\s\-'.]/g, '');
+}
+
+/**
+ * Check if two names are fuzzy matches.
+ * Handles: case differences, punctuation differences, partial matches.
+ */
+function isNameMatch(name1, name2) {
+  var n1 = normalizeName(name1);
+  var n2 = normalizeName(name2);
+  if (!n1 || !n2) return false;
+  if (n1 === n2) return true;
+  /* One contains the other (e.g. "changyinting" contains "yinting") */
+  if (n1.indexOf(n2) !== -1 || n2.indexOf(n1) !== -1) return true;
+  /* Levenshtein-like: allow 1-2 char differences for short names */
+  if (Math.abs(n1.length - n2.length) <= 2) {
+    var diff = 0;
+    var maxLen = Math.max(n1.length, n2.length);
+    for (var i = 0; i < maxLen; i++) {
+      if (n1[i] !== n2[i]) diff++;
+    }
+    if (diff <= 2) return true;
+  }
+  return false;
+}
+
+/**
+ * Match parsed confirm numbers to pending bookings by guest name.
+ * Returns array of { booking, confirmNo, name, matched }.
+ */
+function matchBookingsByName(bookings, parsedNumbers) {
+  var matches = [];
+  var usedBookings = [];
+  var usedNumbers = [];
+
+  /* First pass: exact/partial name match */
+  for (var i = 0; i < parsedNumbers.length; i++) {
+    var pn = parsedNumbers[i];
+    var bestMatch = null;
+    var bestScore = -1;
+
+    for (var j = 0; j < bookings.length; j++) {
+      if (usedBookings.indexOf(j) !== -1) continue;
+      var b = bookings[j];
+      var guestName = b.guestName || '';
+
+      /* Try matching against guest name */
+      if (isNameMatch(guestName, pn.name)) {
+        var score = 100;
+        /* Bonus for exact match */
+        if (normalizeName(guestName) === normalizeName(pn.name)) score += 50;
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = j;
+        }
+      }
+
+      /* Also try matching against pickup name if available */
+      if (b.pickupName && isNameMatch(b.pickupName, pn.name)) {
+        var score2 = 80;
+        if (score2 > bestScore) {
+          bestScore = score2;
+          bestMatch = j;
+        }
+      }
+    }
+
+    if (bestMatch !== null) {
+      matches.push({
+        booking: bookings[bestMatch],
+        confirmNo: pn.confirmNo,
+        name: pn.name,
+        matched: true
+      });
+      usedBookings.push(bestMatch);
+      usedNumbers.push(i);
+    }
+  }
+
+  /* Second pass: unmatched — try to fill remaining by order */
+  for (var k = 0; k < parsedNumbers.length; k++) {
+    if (usedNumbers.indexOf(k) !== -1) continue;
+    var pn2 = parsedNumbers[k];
+
+    /* Find first unused booking */
+    for (var m = 0; m < bookings.length; m++) {
+      if (usedBookings.indexOf(m) !== -1) continue;
+      matches.push({
+        booking: bookings[m],
+        confirmNo: pn2.confirmNo,
+        name: pn2.name,
+        matched: false /* fallback match by order */
+      });
+      usedBookings.push(m);
+      break;
+    }
+  }
+
+  /* Sort by booking checkIn date for consistent display */
+  matches.sort(function (a, b) {
+    return (a.booking.checkIn || '').localeCompare(b.booking.checkIn || '');
+  });
+
+  return matches;
+}
+
 /* ============================================================
  * Formatting Helpers
  * ============================================================ */
@@ -789,6 +951,7 @@ var STEPS = {
   BOOKING_CONFIRM:   'booking_confirm',
   CONFIRMNO_SELECT:  'confirmno_select',
   CONFIRMNO_INPUT:   'confirmno_input',
+  CONFIRMNO_BULK_REVIEW: 'confirmno_bulk_review',  /* 批量确认号审核 */
   MODIFY_SELECT:     'modify_select',
   MODIFY_FIELD:      'modify_field',
   MODIFY_INPUT:      'modify_input',
@@ -951,6 +1114,7 @@ function handleHelp(msg) {
   var text = '<b>BookingHub Bot 使用说明</b>\n\n';
   text += '📝 <b>/订房</b> — 贴上订房文字或逐步按钮选择\n';
   text += '✅ <b>/确认号</b> — 填入公关回复的确认编号\n';
+  text += '  💡 批量确认号：直接把公关的统一回复粘贴/转发给 Bot，会自动识别并匹配\n';
   text += '✏️ <b>/修改</b> — 修改订房资料（日期/备注等）\n';
   text += '❌ <b>/取消</b> — 取消订房\n';
   text += '📋 <b>/查询</b> — 查询订房记录\n';
@@ -961,6 +1125,8 @@ function handleHelp(msg) {
   text += '3. 按钮选择所属代理\n';
   text += '4. 输入举牌名称\n';
   text += '5. 确认送出\n\n';
+  text += '<b>批量确认号：</b>\n';
+  text += '公关统一回复多个确认号时，直接把消息转发或粘贴给 Bot，系统会自动按姓名匹配并填入。\n\n';
   text += '系统会自动同步到管理后台。';
   sendMessage(chatId, text, null);
 }
@@ -1334,7 +1500,8 @@ function submitBooking(chatId, userId, session, user) {
     text += '💰 洗码门槛：' + formatNum(booking.threshold) + '\n';
     text += '💵 费用类型：' + (booking.feeStatus === 'paid' ? '收费订房' : '免费订房') + '\n';
     text += '\n⏳ 状态：<b>待确认</b>\n';
-    text += '收到公关确认号后，请使用 /确认号 填入。';
+    text += '收到公关确认号后，请使用 /确认号 填入。\n';
+    text += '💡 如公关一次回复多个确认号，直接把消息粘贴或转发给 Bot 即可自动识别。';
 
     clearSession(userId);
     sendMessage(chatId, text, mainMenuKB(getEmployeeByTgId(user.id)));
@@ -1402,7 +1569,8 @@ function startConfirmNo(userId, chatId, user) {
 
     rows.push([{ text: '⬅️ 取消', callback_data: 'book_cancel' }]);
 
-    text += '\n点击下方按钮选择：';
+    text += '\n点击下方按钮选择：\n\n';
+    text += '💡 <b>批量确认号</b>：直接把公关的统一回复粘贴或转发给 Bot，系统会自动识别多个确认号并匹配。';
     sendMessage(chatId, text, kb(rows));
   });
 }
@@ -1463,6 +1631,180 @@ function handleConfirmNoInput(userId, chatId, text) {
       sendMessage(chatId, text2, mainMenuKB(getEmployeeByTgId(userId)));
     });
   });
+}
+
+/* ============================================================
+ * /确认号 — Bulk Confirm Number Flow (Smart Recognition)
+ * ============================================================ */
+
+/**
+ * Auto-detect and handle bulk confirmation numbers from PR reply.
+ * Called when user pastes/forwards a PR reply containing multiple confirm numbers.
+ */
+function handleBulkConfirmNo(userId, chatId, text, user) {
+  var parsed = parseBulkConfirmNumbers(text);
+  if (parsed.length === 0) {
+    /* Not a bulk confirm number message — show menu */
+    sendMessage(chatId, '👋 操作菜单：', mainMenuKB(getEmployeeByTgId(userId)));
+    return;
+  }
+
+  sendMessage(chatId, '⏳ 正在识别批量确认号，请稍候...');
+
+  /* Fetch bookings for this employee */
+  fbGet(CONFIG.FIREBASE.PATHS.BOOKINGS, function (err, data) {
+    if (err || !data) {
+      sendMessage(chatId, '查询失败，请稍后重试。', mainMenuKB(getEmployeeByTgId(userId)));
+      return;
+    }
+
+    var emp = getEmployeeByTgId(userId);
+    var empId = emp ? emp.id : '';
+    var bookings = [];
+
+    for (var key in data) {
+      if (data.hasOwnProperty(key)) {
+        var b = data[key];
+        if (!b._deleted && !b.archived &&
+            b.status === BOOKING_STATUS.PENDING &&
+            (!b.confirmNo)) {
+          /* Show bookings by this employee, or all if admin */
+          if (emp && emp.role === EMPLOYEE_ROLES.ADMIN) {
+            bookings.push(b);
+          } else if (b.employeeId === empId) {
+            bookings.push(b);
+          }
+        }
+      }
+    }
+
+    if (bookings.length === 0) {
+      sendMessage(chatId, '暂无待确认的订房记录。', mainMenuKB(emp));
+      return;
+    }
+
+    /* Match parsed numbers to bookings */
+    var matches = matchBookingsByName(bookings, parsed);
+
+    if (matches.length === 0) {
+      sendMessage(chatId, '❌ 无法匹配到任何待确认的订房。\n\n' +
+        '请确认公关回复中的姓名与订房客人姓名一致。', mainMenuKB(emp));
+      return;
+    }
+
+    /* Store in session for confirmation */
+    var session = createSession(userId, chatId);
+    session.step = STEPS.CONFIRMNO_BULK_REVIEW;
+    session.data.bulkMatches = matches;
+
+    sendBulkReview(chatId, userId, matches);
+  });
+}
+
+/**
+ * Send the bulk confirm number review message with inline keyboard.
+ */
+function sendBulkReview(chatId, userId, matches) {
+  var text = '<b>✅ 批量确认号识别结果</b>\n\n';
+  text += '识别到 <b>' + matches.length + '</b> 笔确认号，匹配结果如下：\n\n';
+
+  var rows = [];
+  for (var i = 0; i < matches.length; i++) {
+    var m = matches[i];
+    var icon = m.matched ? '✅' : '⚠️';
+    text += icon + ' <b>' + escapeHtml(m.booking.guestName) + '</b>\n';
+    text += '   🔢 确认号：<code>' + escapeHtml(m.confirmNo) + '</code>\n';
+    text += '   📅 ' + (m.booking.checkIn || '?') + ' ~ ' + (m.booking.checkOut || '?') + '\n';
+    if (!m.matched) {
+      text += '   ⚠️ 按顺序匹配，请核对\n';
+    }
+    text += '\n';
+  }
+
+  text += '请确认以上匹配是否正确：';
+
+  rows.push([
+    { text: '✅ 全部确认', callback_data: 'bulkcnf:yes' },
+    { text: '❌ 取消', callback_data: 'book_cancel' }
+  ]);
+
+  sendMessage(chatId, text, kb(rows));
+}
+
+/**
+ * Execute bulk confirm number writes to Firebase.
+ */
+function executeBulkConfirmNo(userId, chatId, matches) {
+  if (!matches || matches.length === 0) {
+    sendMessage(chatId, '❌ 没有可确认的订房。', mainMenuKB(getEmployeeByTgId(userId)));
+    clearSession(userId);
+    return;
+  }
+
+  sendMessage(chatId, '⏳ 正在写入确认号...');
+
+  var completed = 0;
+  var failed = 0;
+  var results = [];
+
+  function processOne(idx) {
+    if (idx >= matches.length) {
+      /* All done — send summary */
+      var text = '<b>✅ 批量确认号完成</b>\n\n';
+      text += '成功：' + completed + ' / ' + matches.length + '\n';
+      if (failed > 0) text += '失败：' + failed + '\n';
+      text += '\n';
+      for (var i = 0; i < results.length; i++) {
+        var r = results[i];
+        text += (r.ok ? '✅' : '❌') + ' ' + escapeHtml(r.guestName) +
+                ' → <code>' + escapeHtml(r.confirmNo) + '</code>\n';
+      }
+
+      clearSession(userId);
+      sendMessage(chatId, text, mainMenuKB(getEmployeeByTgId(userId)));
+      return;
+    }
+
+    var m = matches[idx];
+    var fbKey = m.booking._fbKey;
+
+    fbGet(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), function (err, booking) {
+      if (err || !booking) {
+        failed++;
+        results.push({ ok: false, guestName: m.booking.guestName, confirmNo: m.confirmNo });
+        processOne(idx + 1);
+        return;
+      }
+
+      booking.confirmNo = m.confirmNo;
+      booking.status = BOOKING_STATUS.CONFIRMED;
+      booking._updatedAt = Date.now();
+
+      fbPut(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), booking, function (err2) {
+        if (err2) {
+          failed++;
+          results.push({ ok: false, guestName: m.booking.guestName, confirmNo: m.confirmNo });
+        } else {
+          completed++;
+          results.push({ ok: true, guestName: m.booking.guestName, confirmNo: m.confirmNo });
+
+          writeBotLog({
+            _fbKey:     generateFbKey(),
+            _createdAt: Date.now(),
+            employee:   booking.employee,
+            employeeId: booking.employeeId,
+            action:     'confirm_no_bulk',
+            message:    '批量确认号：' + booking.guestName + ' -> ' + m.confirmNo,
+            bookingKey: fbKey,
+            userId:     userId
+          });
+        }
+        processOne(idx + 1);
+      });
+    });
+  }
+
+  processOne(0);
 }
 
 /* ============================================================
@@ -2239,6 +2581,17 @@ function handleCallback(cb) {
       return;
     }
 
+    /* Bulk confirm number flow */
+    if (data === 'bulkcnf:yes') {
+      var session2 = getSession(userId);
+      if (session2 && session2.data.bulkMatches) {
+        executeBulkConfirmNo(userId, chatId, session2.data.bulkMatches);
+      } else {
+        sendMessage(chatId, '❌ 会话已过期，请重新操作。', mainMenuKB(getEmployeeByTgId(userId)));
+      }
+      return;
+    }
+
     /* Modify flow */
     if (data.indexOf('mod:') === 0) {
       var modKey = data.substring(4);
@@ -2430,6 +2783,14 @@ function handleText(msg) {
 
     /* In groups with @mention or in private chat: show main menu */
     if (!session) {
+      /* Check if message looks like a bulk confirm number reply from PR */
+      var bulkParsed = parseBulkConfirmNumbers(text);
+      if (bulkParsed.length >= 2) {
+        /* Auto-detect bulk confirm numbers */
+        handleBulkConfirmNo(userId, chatId, text, msg.from);
+        return;
+      }
+
       var emp = getEmployeeByTgId(userId);
       var name = emp ? emp.name : getDisplayName(msg.from);
       var roleLabel = (emp && emp.role === EMPLOYEE_ROLES.ADMIN) ? ' 🔑管理员' : '';
@@ -2444,6 +2805,12 @@ function handleText(msg) {
     /* Route to appropriate handler based on step */
     switch (session.step) {
       case STEPS.BOOKING_WAIT_TEXT:
+        /* Check if this is a bulk confirm number message (user forwarded PR reply while in booking flow) */
+        var bulkParsed2 = parseBulkConfirmNumbers(text);
+        if (bulkParsed2.length >= 2) {
+          handleBulkConfirmNo(userId, chatId, text, msg.from);
+          return;
+        }
         handleBookingText(userId, chatId, text, msg.from);
         break;
 
@@ -2493,8 +2860,27 @@ function handleText(msg) {
         showBookingConfirm(chatId, session);
         break;
 
+      case STEPS.CONFIRMNO_SELECT:
+        /* User may have pasted a bulk confirm number reply instead of clicking buttons */
+        var bulkParsed3 = parseBulkConfirmNumbers(text);
+        if (bulkParsed3.length >= 2) {
+          clearSession(userId); /* Clear the old confirmNo select session */
+          handleBulkConfirmNo(userId, chatId, text, msg.from);
+          return;
+        }
+        /* Unknown text in confirmNo select — show menu */
+        clearSession(userId);
+        sendMessage(chatId, '👋 操作菜单：', mainMenuKB(getEmployeeByTgId(userId)));
+        break;
+
       case STEPS.CONFIRMNO_INPUT:
         handleConfirmNoInput(userId, chatId, text);
+        break;
+
+      case STEPS.CONFIRMNO_BULK_REVIEW:
+        /* User is reviewing bulk matches — any text cancels and shows menu */
+        clearSession(userId);
+        sendMessage(chatId, '❌ 已取消批量确认号操作。', mainMenuKB(getEmployeeByTgId(userId)));
         break;
 
       case STEPS.MODIFY_INPUT:
