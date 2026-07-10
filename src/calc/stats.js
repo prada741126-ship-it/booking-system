@@ -49,6 +49,21 @@ var Stats = {
     return sum;
   },
 
+  /**
+   * Total threshold weighted by nights (sum of booking.threshold × booking.nights)
+   * 1 room = 1 night; a 2-night booking contributes threshold × 2
+   */
+  totalThresholdNights: function (bookings) {
+    if (!bookings) return 0;
+    var sum = 0;
+    for (var i = 0; i < bookings.length; i++) {
+      var th = Number(bookings[i].threshold) || 0;
+      var n = Number(bookings[i].nights) || 0;
+      sum += th * n;
+    }
+    return sum;
+  },
+
   /* ===== Financial Stats (v8 new) ===== */
 
   /**
@@ -471,10 +486,11 @@ var Stats = {
   summary: function (bookings) {
     if (!bookings) bookings = [];
     return {
-      totalBookings:      bookings.length,
-      totalNights:        Stats.totalNights(bookings),
-      totalThreshold:     Stats.totalThreshold(bookings),
-      totalProfit:        Stats.totalProfit(bookings),
+      totalBookings:        bookings.length,
+      totalNights:          Stats.totalNights(bookings),
+      totalThreshold:       Stats.totalThreshold(bookings),
+      totalThresholdNights: Stats.totalThresholdNights(bookings),
+      totalProfit:          Stats.totalProfit(bookings),
       totalChargeGuest:   Stats.totalChargeGuest(bookings),
       totalChargeCompany: Stats.totalChargeCompany(bookings),
       byStatus:           Stats.countByStatus(bookings),

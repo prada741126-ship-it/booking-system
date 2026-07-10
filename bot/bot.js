@@ -1152,8 +1152,7 @@ function handleHelp(msg) {
   text += '1. 贴上订房文字（姓名/入住/退房/备注）\n';
   text += '2. 按钮选择酒店体系 → 酒店 → 房型\n';
   text += '3. 按钮选择所属代理\n';
-  text += '4. 输入举牌名称\n';
-  text += '5. 确认送出\n\n';
+  text += '4. 确认送出\n\n';
   text += '<b>批量确认号：</b>\n';
   text += '公关统一回复多个确认号时，直接把消息转发或粘贴给 Bot，系统会自动按姓名匹配并填入。\n\n';
   text += '系统会自动同步到管理后台。';
@@ -1394,12 +1393,8 @@ function proceedAfterAgent(chatId, session) {
     );
     return;
   }
-  /* All info complete → pickup */
-  session.step = STEPS.BOOKING_PICKUP;
-  sendMessage(chatId,
-    '✅ 代理：<b>' + escapeHtml(d.agent) + '</b>\n\n' +
-    '请输入<b>举牌名称</b>（或输入「无」跳过）：'
-  );
+  /* All info complete → show confirmation summary */
+  showBookingConfirm(chatId, session);
 }
 
 /* Confirm keyboard */
@@ -1424,7 +1419,6 @@ function showBookingConfirm(chatId, session) {
   text += '📅 退房：' + (d.checkOut || '-') + '（' + (d.nights || 0) + ' 晚）\n';
   text += '🚬 吸烟：' + (d.smoking === 'smoking' ? '吸烟' : d.smoking === 'non-smoking' ? '禁烟' : '未指定') + '\n';
   text += '👤 代理：' + (d.agent || '-') + '\n';
-  text += '🪧 举牌：' + (d.pickupName || '-') + '\n';
   text += '💰 洗码门槛：' + formatNum(d.threshold || 0) + '\n';
   text += '💵 费用类型：' + (d.feeStatus === 'paid' ? '收费订房' : '免费订房') + '\n';
   text += '📝 备注：' + (d.remark || '-') + '\n';
@@ -2562,11 +2556,7 @@ function handleCallback(cb) {
       var feeVal = data.substring(9);
       if (session) {
         session.data.feeStatus = feeVal;
-        session.step = STEPS.BOOKING_PICKUP;
-        sendMessage(chatId,
-          '✅ 费用类型：<b>' + (feeVal === 'paid' ? '收费订房' : '免费订房') + '</b>\n\n' +
-          '请输入<b>举牌名称</b>（或输入「无」跳过）：'
-        );
+        showBookingConfirm(chatId, session);
       }
       return;
     }
@@ -2881,12 +2871,6 @@ function handleText(msg) {
         var remark = text.trim();
         session.data.remark = (remark === '无' || remark === '無' || remark.toLowerCase() === 'none') ? '' : remark;
         proceedAfterAgent(chatId, session);
-        break;
-
-      case STEPS.BOOKING_PICKUP:
-        var pickup = text.trim();
-        session.data.pickupName = (pickup === '无' || pickup === '無' || pickup.toLowerCase() === 'none') ? '' : pickup;
-        showBookingConfirm(chatId, session);
         break;
 
       case STEPS.CONFIRMNO_SELECT:
