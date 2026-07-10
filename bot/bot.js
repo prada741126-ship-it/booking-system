@@ -333,10 +333,18 @@ var cache = {
   hotelConfig: null,
   agentList: null,
   employeeList: null,
-  lastRefresh: 0
+  lastRefresh: 0,
+  refreshing: false  /* Prevents concurrent refresh calls */
 };
 
 function refreshCache(callback) {
+  /* Prevent concurrent refresh — if already refreshing, skip */
+  if (cache.refreshing) {
+    if (callback) callback();
+    return;
+  }
+  cache.refreshing = true;
+
   var pending = 3;
   var done = false;
 
@@ -345,6 +353,7 @@ function refreshCache(callback) {
     if (pending <= 0 && !done) {
       done = true;
       cache.lastRefresh = Date.now();
+      cache.refreshing = false;
       if (callback) callback();
     }
   }
@@ -375,12 +384,17 @@ function refreshCache(callback) {
   });
 }
 
+/**
+ * Stale-while-revalidate: use current cache immediately, refresh in background.
+ * This eliminates LAG — messages are never blocked waiting for Firebase.
+ */
 function ensureCacheFresh(callback) {
   if (Date.now() - cache.lastRefresh > CONFIG.CACHE_REFRESH_MS) {
-    refreshCache(callback);
-  } else {
-    if (callback) callback();
+    /* Cache is stale — refresh in background, but proceed immediately */
+    refreshCache();
   }
+  /* Always proceed immediately with current (possibly stale) cache */
+  if (callback) callback();
 }
 
 /* Hotel config helpers (from cache) */
@@ -2762,6 +2776,35 @@ function checkDailyScan() {
 
 var lastUpdateId = 0;
 var polling = false;
+var pollInFlight = false;     /* Prevents concurrent poll() calls */
+var pollScheduled = false;    /* Prevents duplicate poll() scheduling */
+var pollEnded = false;        /* Track if 'end' already fired for this request */
+
+/* Deduplication: track recently processed update IDs */
+var processedUpdates = {};
+var dedupQueue = [];
+var MAX_DEDUP = 200;
+
+function isAlreadyProcessed(updateId) {
+  if (processedUpdates[updateId]) return true;
+  processedUpdates[updateId] = true;
+  dedupQueue.push(updateId);
+  if (dedupQueue.length > MAX_DEDUP) {
+    var old = dedupQueue.shift();
+    delete processedUpdates[old];
+  }
+  return false;
+}
+
+/* Schedule next poll — guaranteed to only schedule once */
+function schedulePoll(delay) {
+  if (pollScheduled) return;
+  pollScheduled = true;
+  setTimeout(function () {
+    pollScheduled = false;
+    poll();
+  }, delay);
+}
 
 function startPolling() {
   if (polling) return;
@@ -2770,6 +2813,11 @@ function startPolling() {
   console.log('[Bot] Starting long-polling...');
 
   function poll() {
+    /* Guard against concurrent polls */
+    if (pollInFlight) return;
+    pollInFlight = true;
+    pollEnded = false;
+
     var body = JSON.stringify({
       offset: lastUpdateId + 1,
       timeout: CONFIG.POLL_TIMEOUT,
@@ -2791,12 +2839,21 @@ function startPolling() {
       var chunks = '';
       res.on('data', function (c) { chunks += c; });
       res.on('end', function () {
+        /* Prevent double-handling: if already ended (e.g. timeout destroyed) skip */
+        if (pollEnded) return;
+        pollEnded = true;
+
         try {
           var json = JSON.parse(chunks);
           if (json.ok && json.result && json.result.length > 0) {
             for (var i = 0; i < json.result.length; i++) {
               var update = json.result[i];
               lastUpdateId = update.update_id;
+
+              /* Skip already-processed updates (dedup) */
+              if (isAlreadyProcessed(update.update_id)) {
+                continue;
+              }
 
               if (update.message) {
                 handleText(update.message);
@@ -2808,17 +2865,26 @@ function startPolling() {
         } catch (e) {
           console.error('[Poll] Parse error:', e.message);
         }
-        setTimeout(poll, 100);
+
+        pollInFlight = false;
+        schedulePoll(50);
       });
     });
 
     req.on('error', function (e) {
+      /* Prevent double-handling with 'end' event */
+      if (pollEnded) return;
+      pollEnded = true;
+
       console.error('[Poll] Error:', e.message);
       console.log('[Poll] Retrying in ' + (CONFIG.POLL_RETRY_DELAY / 1000) + 's...');
-      setTimeout(poll, CONFIG.POLL_RETRY_DELAY);
+      pollInFlight = false;
+      schedulePoll(CONFIG.POLL_RETRY_DELAY);
     });
 
     req.on('timeout', function () {
+      /* Timeout is expected during long-polling — just destroy the request */
+      /* The 'end' or 'error' handler will take care of scheduling the next poll */
       req.destroy();
     });
 
