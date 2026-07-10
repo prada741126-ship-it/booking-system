@@ -110,7 +110,7 @@ function build() {
     console.log('       + ' + CSS_FILES[i] + ' (' + css.length + ' bytes)');
   }
   var cssTag = '<style>\n' + cssContent + '\n</style>';
-  html = html.replace('<!-- {{CSS}} -->', cssTag);
+  html = html.split('<!-- {{CSS}} -->').join(cssTag);
 
   /* 3. Read and combine JS */
   console.log('[3/5] Combining JS files...');
@@ -143,7 +143,7 @@ function build() {
   jsContent += '});\n';
   jsContent += '</script>\n';
 
-  html = html.replace('<!-- {{JS}} -->', jsContent);
+  html = html.split('<!-- {{JS}} -->').join(jsContent);
 
   /* 4. Write to dist */
   console.log('[4/5] Writing dist/index.html...');
