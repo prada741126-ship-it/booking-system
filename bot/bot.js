@@ -268,6 +268,16 @@ function generateFbKey() {
   return ts + '-' + rand;
 }
 
+/* Generate a friendly booking number for display (B + YYMMDD + 4-digit random) */
+function generateBookingNo() {
+  var now = new Date();
+  var yy = String(now.getFullYear()).slice(-2);
+  var mm = String(now.getMonth() + 1).padStart(2, '0');
+  var dd = String(now.getDate()).padStart(2, '0');
+  var r = Math.floor(1000 + Math.random() * 9000);
+  return 'B' + yy + mm + dd + '-' + r;
+}
+
 /* Encode Firebase key (replace invalid chars) */
 function encodeFbKey(str) {
   if (!str) return 'key_' + Date.now();
@@ -752,6 +762,7 @@ var STEPS = {
   BOOKING_CHECKOUT:  'booking_checkout',
   BOOKING_SMOKING:   'booking_smoking',
   BOOKING_REMARK:    'booking_remark',
+  BOOKING_FEE_TYPE:  'booking_fee_type',
   BOOKING_PICKUP:    'booking_pickup',
   BOOKING_CONFIRM:   'booking_confirm',
   CONFIRMNO_SELECT:  'confirmno_select',
@@ -1142,12 +1153,27 @@ function proceedAfterAgent(chatId, session) {
     );
     return;
   }
-  /* Remark — if already set, skip to pickup */
-  if (!d.remark) {
+  /* Remark — if already set, skip to fee type */
+  if (!d.remark && d.remark !== '') {
     session.step = STEPS.BOOKING_REMARK;
     sendMessage(chatId,
       '✅ 吸烟：<b>' + (d.smoking === 'smoking' ? '吸烟' : d.smoking === 'non-smoking' ? '禁烟' : '未指定') + '</b>\n\n' +
       '请输入<b>备注</b>（或输入「无」跳过）：'
+    );
+    return;
+  }
+  /* Fee type selection */
+  if (!d.feeStatus) {
+    session.step = STEPS.BOOKING_FEE_TYPE;
+    sendMessage(chatId,
+      '请选择<b>费用类型</b>：',
+      kb([
+        [
+          { text: '🆓 免费订房', callback_data: 'book_fee:free' },
+          { text: '💰 收费订房', callback_data: 'book_fee:paid' }
+        ],
+        [{ text: '⬅️ 返回', callback_data: 'book_back_smoking' }]
+      ])
     );
     return;
   }
@@ -1183,6 +1209,7 @@ function showBookingConfirm(chatId, session) {
   text += '👤 代理：' + (d.agent || '-') + '\n';
   text += '🪧 举牌：' + (d.pickupName || '-') + '\n';
   text += '💰 洗码门槛：' + formatNum(d.threshold || 0) + '\n';
+  text += '💵 费用类型：' + (d.feeStatus === 'paid' ? '收费订房' : '免费订房') + '\n';
   text += '📝 备注：' + (d.remark || '-') + '\n';
   text += '👤 登记员工：' + escapeHtml(d.employee || '-') + '\n';
   text += '\n确认以上资料是否正确？';
@@ -1199,12 +1226,15 @@ function submitBooking(chatId, userId, session, user) {
 
   var nights = d.nights || calcNights(d.checkIn, d.checkOut);
   var month = getMonthStr(d.checkIn) || currentMonth();
+  var bookingNo = generateBookingNo();
 
   var booking = {
     _fbKey:        fbKey,
     _createdAt:    now,
     _updatedAt:    now,
     _source:       'bot',
+
+    bookingNo:     bookingNo,
 
     guestName:     d.guestName || '',
     agent:         d.agent || '',
@@ -1225,7 +1255,7 @@ function submitBooking(chatId, userId, session, user) {
 
     smoking:       d.smoking || 'unspecified',
 
-    feeStatus:     FEE_TYPES.FREE,
+    feeStatus:     d.feeStatus || FEE_TYPES.FREE,
     chargeGuest:   0,
     chargeCompany: 0,
     profit:        0,
@@ -1270,12 +1300,13 @@ function submitBooking(chatId, userId, session, user) {
 
     /* Success message */
     var text = '✅ <b>订房已建立！</b>\n\n';
-    text += '📋 编号：<code>' + fbKey + '</code>\n';
+    text += '📋 訂單編號：<code>' + bookingNo + '</code>\n';
     text += '👤 客人：' + escapeHtml(booking.guestName) + '\n';
     text += '🏨 ' + booking.casino + ' / ' + booking.hotel + '\n';
     text += '🛏️ ' + getRoomLabel(booking.roomType) + '\n';
     text += '📅 ' + booking.checkIn + ' ~ ' + booking.checkOut + '（' + booking.nights + ' 晚）\n';
     text += '💰 洗码门槛：' + formatNum(booking.threshold) + '\n';
+    text += '💵 费用类型：' + (booking.feeStatus === 'paid' ? '收费订房' : '免费订房') + '\n';
     text += '\n⏳ 状态：<b>待确认</b>\n';
     text += '收到公关确认号后，请使用 /确认号 填入。';
 
@@ -2124,10 +2155,40 @@ function handleCallback(cb) {
       var smokeVal = data.substring(11);
       if (session) {
         session.data.smoking = smokeVal;
-        session.step = STEPS.BOOKING_REMARK;
+        proceedAfterAgent(chatId, session);
+      }
+      return;
+    }
+
+    /* Booking fee type selection */
+    if (data.indexOf('book_fee:') === 0) {
+      var feeVal = data.substring(9);
+      if (session) {
+        session.data.feeStatus = feeVal;
+        session.step = STEPS.BOOKING_PICKUP;
         sendMessage(chatId,
-          '✅ 吸烟：<b>' + (smokeVal === 'smoking' ? '吸烟' : smokeVal === 'non-smoking' ? '禁烟' : '未指定') + '</b>\n\n' +
-          '请输入<b>备注</b>（或输入「无」跳过）：'
+          '✅ 费用类型：<b>' + (feeVal === 'paid' ? '收费订房' : '免费订房') + '</b>\n\n' +
+          '请输入<b>举牌名称</b>（或输入「无」跳过）：'
+        );
+      }
+      return;
+    }
+
+    /* Back to smoking */
+    if (data === 'book_back_smoking') {
+      if (session) {
+        session.data.feeStatus = null;
+        session.step = STEPS.BOOKING_SMOKING;
+        sendMessage(chatId,
+          '请选择<b>吸烟偏好</b>：',
+          kb([
+            [
+              { text: '🚬 吸烟', callback_data: 'book_smoke:smoking' },
+              { text: '🚭 禁烟', callback_data: 'book_smoke:non-smoking' },
+              { text: '❓ 未指定', callback_data: 'book_smoke:unspecified' }
+            ],
+            [{ text: '⬅️ 返回', callback_data: 'book_back_agent' }]
+          ])
         );
       }
       return;
@@ -2354,11 +2415,7 @@ function handleText(msg) {
       case STEPS.BOOKING_REMARK:
         var remark = text.trim();
         session.data.remark = (remark === '无' || remark === '無' || remark.toLowerCase() === 'none') ? '' : remark;
-        session.step = STEPS.BOOKING_PICKUP;
-        sendMessage(chatId,
-          '✅ 备注已记录\n\n' +
-          '请输入<b>举牌名称</b>（或输入「无」跳过）：'
-        );
+        proceedAfterAgent(chatId, session);
         break;
 
       case STEPS.BOOKING_PICKUP:

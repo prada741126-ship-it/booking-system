@@ -10636,6 +10636,7 @@ function viewBookingDetail(fbKey) {
   var body = '';
   body += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3);">';
 
+  body += _detailField('訂單編號', b.bookingNo || b._fbKey || '--');
   body += _detailField(TERMS.guestName, b.guestName);
   body += _detailField(TERMS.agent, b.agent);
   body += _detailField(TERMS.casino, b.casino);
