@@ -43,7 +43,7 @@ var OverviewPage = (function () {
     html += _kpiCard('kpi-blue', '本月房晚數', summ.totalNights, '晚', '本月入住總房晚數（1間房=1晚）',
       '<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>', true);
 
-    html += _kpiCard('kpi-gold', '總洗碼門檻', Utils.formatNumber(summ.totalThresholdNights), '', '本月入住門檻×晚數總和',
+    html += _kpiCard('kpi-gold', '總洗碼門檻', Utils.formatNumber(Math.round(summ.totalThresholdNights / 10000)), '萬', '本月入住門檻×晚數總和',
       '<svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>', true);
 
     html += '</div>';

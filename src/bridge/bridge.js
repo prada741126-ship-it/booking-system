@@ -105,7 +105,7 @@ function openBookingModal(presetDate) {
   body += '<div class="form-row-3" id="bk-fee-row" style="display:none;">';
   body += '  <div class="form-group"><label>' + Utils.escapeHtml(TERMS.chargeGuest) + '</label><input type="number" class="form-control" id="bk-chargeGuest" value="0" min="0"></div>';
   body += '  <div class="form-group"><label>' + Utils.escapeHtml(TERMS.chargeCompany) + '</label><input type="number" class="form-control" id="bk-chargeCompany" value="0" min="0"></div>';
-  body += '  <div class="form-group"><label>' + Utils.escapeHtml(TERMS.threshold) + '</label><input type="number" class="form-control" id="bk-threshold" value="0" readonly style="opacity:0.6;"></div>';
+  body += '  <div class="form-group"><label>' + Utils.escapeHtml(TERMS.threshold) + '（萬）</label><input type="number" class="form-control" id="bk-threshold" value="0" readonly style="opacity:0.6;"></div>';
   body += '</div>';
 
   body += '<div class="form-row">';
@@ -168,7 +168,7 @@ function onHotelChange() {
   for (var i = 0; i < ROOM_TYPES.length; i++) {
     var threshold = Hotels.getThreshold(casino, hotel, ROOM_TYPES[i].value);
     roomSelect.innerHTML += '<option value="' + ROOM_TYPES[i].value + '" data-threshold="' + threshold + '">' +
-      Utils.escapeHtml(ROOM_TYPES[i].label) + ' (\u9580\u6abbi ' + Utils.formatNumber(threshold) + ')</option>';
+      Utils.escapeHtml(ROOM_TYPES[i].label) + ' (\u9580\u6abbi ' + Utils.formatNumber(Math.round(threshold / 10000)) + '\u842c)</option>';
   }
   roomSelect.disabled = false;
 }
@@ -181,7 +181,7 @@ function onRoomTypeChange() {
 
   if (casino && hotel && roomType) {
     var threshold = Hotels.getThreshold(casino, hotel, roomType);
-    if (thresholdInput) thresholdInput.value = threshold || 0;
+    if (thresholdInput) thresholdInput.value = Math.round((threshold || 0) / 10000);
   }
 }
 
@@ -228,7 +228,7 @@ function saveBookingForm() {
   /* Get threshold from hidden field */
   var thresholdInput = document.getElementById('bk-threshold');
   if (thresholdInput) {
-    data.threshold = Number(thresholdInput.value) || 0;
+    data.threshold = (Number(thresholdInput.value) || 0) * 10000;
   }
 
   /* Validation */
@@ -322,7 +322,7 @@ function viewBookingDetail(fbKey) {
   body += _detailField(TERMS.chargeGuest, b.feeStatus === 'paid' ? Utils.formatCurrency(b.chargeGuest, b.currency) : '--');
   body += _detailField(TERMS.chargeCompany, b.feeStatus === 'paid' ? Utils.formatCurrency(b.chargeCompany, b.currency) : '--');
   body += _detailField(TERMS.profit, b.feeStatus === 'paid' ? Utils.formatCurrency(b.profit, b.currency) : '--');
-  body += _detailField(TERMS.threshold, Utils.formatNumber(b.threshold));
+  body += _detailField(TERMS.threshold, Utils.formatNumber(Math.round((b.threshold || 0) / 10000)) + ' 萬');
   body += _detailField(TERMS.transfer, _transferLabel(b.transfer));
   body += _detailField(TERMS.pickupName, b.pickupName || '--');
   body += _detailField(TERMS.employee, b.employee || '--');

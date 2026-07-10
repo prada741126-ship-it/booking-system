@@ -142,8 +142,8 @@ var HotelConfigPage = (function () {
     var html = '<div class="hc-room-cell">';
     html += '  <div class="hc-room-label">' + Utils.escapeHtml(roomType.short) + '</div>';
     html += '  <div class="hc-room-threshold" onclick="HotelConfigPage.editThreshold(\'' + Utils.escapeHtml(casinoName) + '\',\'' + Utils.escapeHtml(hotelName) + '\',\'' + roomType.value + '\')" title="點擊編輯門檻">';
-    html += '    <span style="font-size:var(--fs-xs);color:var(--text-muted);">門檻</span>';
-    html += '    <span style="font-weight:600;color:var(--color-primary);">' + Utils.formatNumber(config.threshold || 0) + '</span>';
+    html += '    <span style="font-size:var(--fs-xs);color:var(--text-muted);">門檻(萬)</span>';
+    html += '    <span style="font-weight:600;color:var(--color-primary);">' + Utils.formatNumber(Math.round((config.threshold || 0) / 10000)) + '</span>';
     html += '  </div>';
     html += '</div>';
     return html;
@@ -262,8 +262,9 @@ var HotelConfigPage = (function () {
     }
 
     var body =
-      '<div class="form-group"><label>洗碼門檻</label>' +
-      '<input type="number" id="hc-threshold" value="' + (current.threshold || 0) + '" placeholder="0"></div>' +
+      '<div class="form-group"><label>洗碼門檻（萬）</label>' +
+      '<input type="number" id="hc-threshold" value="' + Math.round((current.threshold || 0) / 10000) + '" placeholder="0"></div>' +
+      '<p style="font-size:var(--fs-xs);color:var(--text-muted);">以萬為單位輸入，例如 30 = 30萬</p>' +
       '<div class="form-group"><label>預設房價</label>' +
       '<input type="number" id="hc-default-price" value="' + (current.defaultPrice || 0) + '" placeholder="0"></div>' +
       '<p style="font-size:var(--fs-xs);color:var(--text-muted);">' + Utils.escapeHtml(casinoName + ' / ' + hotelName + ' / ' + rtLabel) + '</p>';
@@ -276,7 +277,8 @@ var HotelConfigPage = (function () {
   }
 
   function confirmEditThreshold(casinoName, hotelName, roomType) {
-    var threshold = Number(document.getElementById('hc-threshold').value) || 0;
+    var thresholdWan = Number(document.getElementById('hc-threshold').value) || 0;
+    var threshold = thresholdWan * 10000;
     var defaultPrice = Number(document.getElementById('hc-default-price').value) || 0;
 
     Hotels.updateRoomConfig(casinoName, hotelName, roomType, {

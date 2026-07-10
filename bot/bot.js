@@ -1284,7 +1284,7 @@ function roomTypeKB(casino, hotel) {
   for (var i = 0; i < ROOM_TYPES.length; i++) {
     var rt = ROOM_TYPES[i];
     var threshold = (rc[rt.value] && rc[rt.value].threshold) ? rc[rt.value].threshold : 0;
-    var label = rt.label + ' (门槛: ' + formatNum(threshold) + ')';
+    var label = rt.label + ' (门槛: ' + formatNum(Math.round(threshold / 10000)) + '万)';
     rows.push([{ text: label, callback_data: 'room:' + rt.value }]);
   }
   rows.push([{ text: '⬅️ 返回', callback_data: 'book_back_hotel' }]);
@@ -1419,7 +1419,7 @@ function showBookingConfirm(chatId, session) {
   text += '📅 退房：' + (d.checkOut || '-') + '（' + (d.nights || 0) + ' 晚）\n';
   text += '🚬 吸烟：' + (d.smoking === 'smoking' ? '吸烟' : d.smoking === 'non-smoking' ? '禁烟' : '未指定') + '\n';
   text += '👤 代理：' + (d.agent || '-') + '\n';
-  text += '💰 洗码门槛：' + formatNum(d.threshold || 0) + '\n';
+  text += '💰 洗码门槛：' + formatNum(Math.round((d.threshold || 0) / 10000)) + '万\n';
   text += '💵 费用类型：' + (d.feeStatus === 'paid' ? '收费订房' : '免费订房') + '\n';
   text += '📝 备注：' + (d.remark || '-') + '\n';
   text += '👤 登记员工：' + escapeHtml(d.employee || '-') + '\n';
@@ -1520,7 +1520,7 @@ function submitBooking(chatId, userId, session, user) {
     text += '🏨 ' + booking.casino + ' / ' + booking.hotel + '\n';
     text += '🛏️ ' + getRoomLabel(booking.roomType) + '\n';
     text += '📅 ' + booking.checkIn + ' ~ ' + booking.checkOut + '（' + booking.nights + ' 晚）\n';
-    text += '💰 洗码门槛：' + formatNum(booking.threshold) + '\n';
+    text += '💰 洗码门槛：' + formatNum(Math.round((booking.threshold || 0) / 10000)) + '万\n';
     text += '💵 费用类型：' + (booking.feeStatus === 'paid' ? '收费订房' : '免费订房') + '\n';
     text += '\n⏳ 状态：<b>待确认</b>\n';
     text += '收到公关确认号后，请使用 /确认号 填入。\n';
@@ -2503,7 +2503,7 @@ function handleCallback(cb) {
         var empId = emp ? emp.id : String(userId);
         sendMessage(chatId,
           '✅ 房型：<b>' + getRoomLabel(roomType) + '</b>\n' +
-          '💰 洗码门槛：' + formatNum(session.data.threshold) + '\n\n' +
+          '💰 洗码门槛：' + formatNum(Math.round((session.data.threshold || 0) / 10000)) + '万\n\n' +
           '请选择<b>所属代理</b>：',
           agentKB(empId)
         );
