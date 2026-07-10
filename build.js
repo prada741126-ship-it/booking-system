@@ -154,7 +154,7 @@ function build() {
   jsContent += '  sessionStorage.setItem("_vc","1");\n';
   jsContent += '  setTimeout(function(){\n';
   jsContent += '    try {\n';
-  jsContent += '      fetch(window.location.href.split("?")[0] + "?_cb=" + Date.now(), {cache:"no-store"})\n';
+  jsContent += '      fetch(window.location.href.split("?")[0].replace(/#.*$/,"") + "index.html", {cache:"no-store"})\n';
   jsContent += '        .then(function(r){return r.text();})\n';
   jsContent += '        .then(function(html){\n';
   jsContent += '          var m = html.match(/BUILD_VERSION\\s*=\\s*["\']([0-9]+)["\']/);\n';
@@ -163,7 +163,7 @@ function build() {
   jsContent += '            window.location.reload();\n';
   jsContent += '          }\n';
   jsContent += '        })\n';
-  jsContent += '        .catch(function(){});\n';
+  jsContent += '        .catch(function(e){console.log("[Cache] version check failed:",e.message);});\n';
   jsContent += '    } catch(e) {}\n';
   jsContent += '  }, 2000);\n';
   jsContent += '})();\n';
