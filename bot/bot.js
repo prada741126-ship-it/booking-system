@@ -2806,91 +2806,92 @@ function schedulePoll(delay) {
   }, delay);
 }
 
+/* Single poll request — module-level so schedulePoll can reach it */
+function poll() {
+  /* Guard against concurrent polls */
+  if (pollInFlight) return;
+  pollInFlight = true;
+  pollEnded = false;
+
+  var body = JSON.stringify({
+    offset: lastUpdateId + 1,
+    timeout: CONFIG.POLL_TIMEOUT,
+    allowed_updates: ['message', 'callback_query']
+  });
+
+  var options = {
+    hostname: 'api.telegram.org',
+    path: '/bot' + CONFIG.TELEGRAM_TOKEN + '/getUpdates',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body)
+    },
+    timeout: (CONFIG.POLL_TIMEOUT + 10) * 1000
+  };
+
+  var req = https.request(options, function (res) {
+    var chunks = '';
+    res.on('data', function (c) { chunks += c; });
+    res.on('end', function () {
+      /* Prevent double-handling: if already ended (e.g. timeout destroyed) skip */
+      if (pollEnded) return;
+      pollEnded = true;
+
+      try {
+        var json = JSON.parse(chunks);
+        if (json.ok && json.result && json.result.length > 0) {
+          for (var i = 0; i < json.result.length; i++) {
+            var update = json.result[i];
+            lastUpdateId = update.update_id;
+
+            /* Skip already-processed updates (dedup) */
+            if (isAlreadyProcessed(update.update_id)) {
+              continue;
+            }
+
+            if (update.message) {
+              handleText(update.message);
+            } else if (update.callback_query) {
+              handleCallback(update.callback_query);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[Poll] Parse error:', e.message);
+      }
+
+      pollInFlight = false;
+      schedulePoll(50);
+    });
+  });
+
+  req.on('error', function (e) {
+    /* Prevent double-handling with 'end' event */
+    if (pollEnded) return;
+    pollEnded = true;
+
+    console.error('[Poll] Error:', e.message);
+    console.log('[Poll] Retrying in ' + (CONFIG.POLL_RETRY_DELAY / 1000) + 's...');
+    pollInFlight = false;
+    schedulePoll(CONFIG.POLL_RETRY_DELAY);
+  });
+
+  req.on('timeout', function () {
+    /* Timeout is expected during long-polling — just destroy the request */
+    /* The 'end' or 'error' handler will take care of scheduling the next poll */
+    req.destroy();
+  });
+
+  req.write(body);
+  req.end();
+}
+
 function startPolling() {
   if (polling) return;
   polling = true;
 
   console.log('[Bot] Starting long-polling...');
-
-  function poll() {
-    /* Guard against concurrent polls */
-    if (pollInFlight) return;
-    pollInFlight = true;
-    pollEnded = false;
-
-    var body = JSON.stringify({
-      offset: lastUpdateId + 1,
-      timeout: CONFIG.POLL_TIMEOUT,
-      allowed_updates: ['message', 'callback_query']
-    });
-
-    var options = {
-      hostname: 'api.telegram.org',
-      path: '/bot' + CONFIG.TELEGRAM_TOKEN + '/getUpdates',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body)
-      },
-      timeout: (CONFIG.POLL_TIMEOUT + 10) * 1000
-    };
-
-    var req = https.request(options, function (res) {
-      var chunks = '';
-      res.on('data', function (c) { chunks += c; });
-      res.on('end', function () {
-        /* Prevent double-handling: if already ended (e.g. timeout destroyed) skip */
-        if (pollEnded) return;
-        pollEnded = true;
-
-        try {
-          var json = JSON.parse(chunks);
-          if (json.ok && json.result && json.result.length > 0) {
-            for (var i = 0; i < json.result.length; i++) {
-              var update = json.result[i];
-              lastUpdateId = update.update_id;
-
-              /* Skip already-processed updates (dedup) */
-              if (isAlreadyProcessed(update.update_id)) {
-                continue;
-              }
-
-              if (update.message) {
-                handleText(update.message);
-              } else if (update.callback_query) {
-                handleCallback(update.callback_query);
-              }
-            }
-          }
-        } catch (e) {
-          console.error('[Poll] Parse error:', e.message);
-        }
-
-        pollInFlight = false;
-        schedulePoll(50);
-      });
-    });
-
-    req.on('error', function (e) {
-      /* Prevent double-handling with 'end' event */
-      if (pollEnded) return;
-      pollEnded = true;
-
-      console.error('[Poll] Error:', e.message);
-      console.log('[Poll] Retrying in ' + (CONFIG.POLL_RETRY_DELAY / 1000) + 's...');
-      pollInFlight = false;
-      schedulePoll(CONFIG.POLL_RETRY_DELAY);
-    });
-
-    req.on('timeout', function () {
-      /* Timeout is expected during long-polling — just destroy the request */
-      /* The 'end' or 'error' handler will take care of scheduling the next poll */
-      req.destroy();
-    });
-
-    req.write(body);
-    req.end();
-  }
 
   poll();
 }
