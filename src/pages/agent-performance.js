@@ -63,6 +63,12 @@ var AgentPerfPage = (function () {
 
     html += '</div>';
 
+    /* Booking detail table with threshold per booking */
+    html += '<div class="card" style="margin-top:var(--sp-4);">';
+    html += '  <div class="card-title"><div class="card-icon"><svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zm0-8v2h14V9H7z"/></svg></div>逐筆訂房明細（含洗碼門檻）</div>';
+    html += _detailTable(monthBookings);
+    html += '</div>';
+
     container.innerHTML = html;
   }
 
@@ -161,6 +167,59 @@ var AgentPerfPage = (function () {
 
     html += '</tbody></table></div></div>';
     return html;
+  }
+
+  function _detailTable(bookings) {
+    if (!bookings || bookings.length === 0) return _emptyStateMini('暫無數據');
+
+    /* Sort by agent, then checkIn */
+    var sorted = bookings.slice().sort(function (a, b) {
+      var agentA = (a.agent || '').toLowerCase();
+      var agentB = (b.agent || '').toLowerCase();
+      if (agentA !== agentB) return agentA < agentB ? -1 : 1;
+      return (a.checkIn || '') < (b.checkIn || '') ? -1 : 1;
+    });
+
+    var html = '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint scrollable">';
+    html += '<table class="data-table"><thead><tr>';
+    html += '<th>代理</th><th>客人</th><th>酒店</th><th>入住</th><th>晚</th>';
+    html += '<th class="num-cell">每晚門檻</th><th class="num-cell">總門檻</th><th>狀態</th>';
+    html += '</tr></thead><tbody>';
+
+    for (var i = 0; i < sorted.length; i++) {
+      var b = sorted[i];
+      var th = Number(b.threshold) || 0;
+      var n = Number(b.nights) || 0;
+      var totalTh = th * n;
+      var thWan = Math.round(th / 10000);
+      var totalThWan = Math.round(totalTh / 10000);
+
+      var statusLabel = _statusLabel(b.status);
+      html += '<tr onclick="viewBookingDetail(\'' + (b._fbKey || '') + '\')" style="cursor:pointer;">';
+      html += '<td style="font-weight:600;">' + Utils.escapeHtml(b.agent || '-') + '</td>';
+      html += '<td>' + Utils.escapeHtml(b.guestName || '-') + '</td>';
+      html += '<td>' + Utils.escapeHtml(b.hotel || '-') + '</td>';
+      html += '<td>' + Utils.escapeHtml((b.checkIn || '').slice(0, 10)) + '</td>';
+      html += '<td class="num-cell">' + n + '</td>';
+      html += '<td class="num-cell">' + thWan + '萬</td>';
+      html += '<td class="num-cell" style="font-weight:700;">' + totalThWan + '萬</td>';
+      html += '<td>' + statusLabel + '</td>';
+      html += '</tr>';
+    }
+
+    html += '</tbody></table></div></div>';
+    return html;
+  }
+
+  function _statusLabel(status) {
+    var map = {
+      'pending': '<span style="color:var(--color-info);">待確認</span>',
+      'confirmed': '<span style="color:var(--color-warning);">已確認</span>',
+      'checked-in': '<span style="color:var(--color-success);">已入住</span>',
+      'checked-out': '<span style="color:var(--text-muted);">已退房</span>',
+      'cancelled': '<span style="color:var(--color-danger);">已取消</span>'
+    };
+    return map[status] || Utils.escapeHtml(status || '-');
   }
 
   function _kpiCard(colorClass, label, value, unit, sub, iconSvg) {

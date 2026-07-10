@@ -6,7 +6,7 @@
 
 /* ===== App Info ===== */
 var APP = {
-  VERSION: '2.0.0',
+  VERSION: '2.0.5',
   TITLE: 'VIP Booking System',
   SYSTEM_NAME: 'BookingHub'
 };
