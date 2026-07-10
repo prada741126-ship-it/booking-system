@@ -11,10 +11,14 @@ var OverviewPage = (function () {
 
     var month = State.get('workingMonth') || Utils.currentMonth();
     var allBookings = Bookings.getAll();
-    var monthBookings = Filters.filterBookings(allBookings, { month: month });
 
+    /* KPI stats: still filtered by check-in month */
+    var monthBookings = Filters.filterBookings(allBookings, { month: month });
     var summ = Stats.summary(monthBookings);
     var total = summ.totalBookings;
+
+    /* Recent bookings: show ALL bookings (cross-month visible), sorted by creation time */
+    var recent = Filters.sortBookings(allBookings, '_createdAt', false).slice(0, 8);
 
     var html = '';
 
@@ -33,20 +37,14 @@ var OverviewPage = (function () {
     html += '  </div>';
     html += '</div>';
 
-    /* KPI Cards */
-    html += '<div class="kpi-grid">';
+    /* KPI Cards — 2 large cards, fixed 50% each */
+    html += '<div class="kpi-grid" style="grid-template-columns: repeat(2, 1fr);">';
 
-    html += _kpiCard('kpi-blue', '本月訂房數', total, '間', '所有訂房記錄',
-      '<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>');
+    html += _kpiCard('kpi-blue', '本月訂房數', total, '間', '本月入住訂房總數',
+      '<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>', true);
 
-    html += _kpiCard('kpi-green', '總房晚數', summ.totalNights, '晚', '一訂房 = 一房',
-      '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm.5 5H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>');
-
-    html += _kpiCard('kpi-gold', '總洗碼門檻', Utils.formatNumber(summ.totalThreshold), '', '所有訂房門檻總和',
-      '<svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>');
-
-    html += _kpiCard('kpi-amber', '總利潤', Utils.formatCurrency(summ.totalProfit, CURRENCY_DEFAULT), '', '向客人收 - 交公司',
-      '<svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>');
+    html += _kpiCard('kpi-gold', '總洗碼門檻', Utils.formatNumber(summ.totalThreshold), '', '本月入住門檻總和',
+      '<svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>', true);
 
     html += '</div>';
 
@@ -94,7 +92,6 @@ var OverviewPage = (function () {
     html += '    最近訂房';
     html += '  </div>';
 
-    var recent = Filters.sortBookings(monthBookings, '_createdAt', false).slice(0, 8);
     if (recent.length === 0) {
       html += _emptyStateMini('暫無訂房記錄，點擊「新增訂房」開始');
     } else {
@@ -112,8 +109,9 @@ var OverviewPage = (function () {
     container.innerHTML = html;
   }
 
-  function _kpiCard(colorClass, label, value, unit, sub, iconSvg) {
-    var html = '<div class="kpi-card ' + colorClass + '">';
+  function _kpiCard(colorClass, label, value, unit, sub, iconSvg, large) {
+    var cls = 'kpi-card ' + colorClass + (large ? ' kpi-large' : '');
+    var html = '<div class="' + cls + '">';
     html += '  <div class="kpi-header">';
     html += '    <span class="kpi-label">' + Utils.escapeHtml(label) + '</span>';
     html += '    <div class="kpi-icon">' + iconSvg + '</div>';

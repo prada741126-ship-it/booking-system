@@ -112,6 +112,22 @@
 .kpi-trend.up { color: var(--color-success); }
 .kpi-trend.down { color: var(--color-danger); }
 
+/* KPI large variant — used when only 2 cards in grid */
+.kpi-card.kpi-large {
+  padding: var(--sp-6) var(--sp-7);
+}
+.kpi-card.kpi-large .kpi-value {
+  font-size: var(--fs-3xl);
+}
+.kpi-card.kpi-large .kpi-icon {
+  width: 40px;
+  height: 40px;
+}
+.kpi-card.kpi-large .kpi-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
 /* ===== Buttons ===== */
 .btn {
   display: inline-flex;
