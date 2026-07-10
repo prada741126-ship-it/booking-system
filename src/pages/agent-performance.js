@@ -180,10 +180,19 @@ var AgentPerfPage = (function () {
       return (a.checkIn || '') < (b.checkIn || '') ? -1 : 1;
     });
 
-    var html = '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint scrollable">';
+    var html = '<div style="margin-bottom:var(--sp-2);color:var(--text-muted);font-size:var(--fs-xs);">';
+    html += '折抵天數 = 客戶轉碼 ÷ 每晚門檻（無條件退位）。若折抵天數 ≥ 入住天數，顯示「達標」';
+    html += '</div>';
+    html += '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint scrollable">';
     html += '<table class="data-table"><thead><tr>';
-    html += '<th>代理</th><th>客人</th><th>酒店</th><th>入住</th><th>晚</th>';
-    html += '<th class="num-cell">每晚門檻</th><th class="num-cell">總門檻</th><th>狀態</th>';
+    html += '<th>代理</th><th>客人</th><th>酒店</th><th>入住</th>';
+    html += '<th style="text-align:center;width:60px;">入住天數</th>';
+    html += '<th style="text-align:right;width:60px;">每晚(萬)</th>';
+    html += '<th style="text-align:right;width:70px;">總門檻(萬)</th>';
+    html += '<th style="text-align:right;width:100px;">客戶轉碼(萬)</th>';
+    html += '<th style="text-align:center;width:60px;">折抵(天)</th>';
+    html += '<th style="text-align:center;width:60px;">剩餘(天)</th>';
+    html += '<th>狀態</th>';
     html += '</tr></thead><tbody>';
 
     for (var i = 0; i < sorted.length; i++) {
@@ -194,15 +203,44 @@ var AgentPerfPage = (function () {
       var thWan = Math.round(th / 10000);
       var totalThWan = Math.round(totalTh / 10000);
 
+      var vol = Number(b.volume) || 0;
+      var volWan = Math.round(vol / 10000);
+
+      /* Discount days = floor(volume / threshold) */
+      var discountDays = 0;
+      if (vol > 0 && th > 0) {
+        discountDays = Math.floor(vol / th);
+      }
+      var discountLabel = discountDays === 0 ? '不足1' : discountDays;
+
+      var remaining = n - discountDays;
+      var remainingLabel, remainingStyle;
+      if (remaining <= 0) {
+        remainingLabel = '達標';
+        remainingStyle = 'color:var(--color-success);font-weight:700;';
+      } else {
+        remainingLabel = remaining;
+        remainingStyle = 'color:var(--color-danger);font-weight:700;';
+      }
+
       var statusLabel = _statusLabel(b.status);
-      html += '<tr onclick="viewBookingDetail(\'' + (b._fbKey || '') + '\')" style="cursor:pointer;">';
+      html += '<tr>';
       html += '<td style="font-weight:600;">' + Utils.escapeHtml(b.agent || '-') + '</td>';
       html += '<td>' + Utils.escapeHtml(b.guestName || '-') + '</td>';
       html += '<td>' + Utils.escapeHtml(b.hotel || '-') + '</td>';
       html += '<td>' + Utils.escapeHtml((b.checkIn || '').slice(0, 10)) + '</td>';
-      html += '<td class="num-cell">' + n + '</td>';
-      html += '<td class="num-cell">' + thWan + '萬</td>';
-      html += '<td class="num-cell" style="font-weight:700;">' + totalThWan + '萬</td>';
+      html += '<td style="text-align:center;">' + n + '</td>';
+      html += '<td style="text-align:right;">' + thWan + '</td>';
+      html += '<td style="text-align:right;">' + totalThWan + '</td>';
+      html += '<td style="text-align:right;">';
+      html += '<input type="number" min="0" step="1" ';
+      html += 'style="width:70px;text-align:right;padding:2px 6px;font-size:var(--fs-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-primary);" ';
+      html += 'value="' + (volWan || '') + '" ';
+      html += 'onchange="updateBookingVolume(\'' + (b._fbKey || '') + '\', this.value)" ';
+      html += 'placeholder="萬">';
+      html += '</td>';
+      html += '<td style="text-align:center;">' + discountLabel + '</td>';
+      html += '<td style="text-align:center;' + remainingStyle + '">' + remainingLabel + '</td>';
       html += '<td>' + statusLabel + '</td>';
       html += '</tr>';
     }
