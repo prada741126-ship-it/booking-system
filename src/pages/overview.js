@@ -112,17 +112,26 @@ var OverviewPage = (function () {
   function _kpiCard(colorClass, label, value, unit, sub, iconSvg, large) {
     var cls = 'kpi-card ' + colorClass + (large ? ' kpi-large' : '');
     var html = '<div class="' + cls + '">';
-    html += '  <div class="kpi-header">';
-    html += '    <span class="kpi-label">' + Utils.escapeHtml(label) + '</span>';
-    html += '    <div class="kpi-icon">' + iconSvg + '</div>';
-    html += '  </div>';
-    html += '  <div class="kpi-value tabular-nums">' + value + '</div>';
-    if (unit || sub) {
-      html += '  <span class="kpi-sub">';
-      if (unit) html += Utils.escapeHtml(unit);
-      if (unit && sub) html += ' — ';
-      if (sub) html += Utils.escapeHtml(sub);
-      html += '</span>';
+    if (large) {
+      html += '  <div class="kpi-icon">' + iconSvg + '</div>';
+      html += '  <div class="kpi-value tabular-nums">' + value + '</div>';
+      html += '  <div class="kpi-label">' + Utils.escapeHtml(label) + '</div>';
+      if (sub) {
+        html += '  <div class="kpi-sub">' + Utils.escapeHtml(sub) + '</div>';
+      }
+    } else {
+      html += '  <div class="kpi-header">';
+      html += '    <span class="kpi-label">' + Utils.escapeHtml(label) + '</span>';
+      html += '    <div class="kpi-icon">' + iconSvg + '</div>';
+      html += '  </div>';
+      html += '  <div class="kpi-value tabular-nums">' + value + '</div>';
+      if (unit || sub) {
+        html += '  <span class="kpi-sub">';
+        if (unit) html += Utils.escapeHtml(unit);
+        if (unit && sub) html += ' — ';
+        if (sub) html += Utils.escapeHtml(sub);
+        html += '</span>';
+      }
     }
     html += '</div>';
     return html;
