@@ -142,8 +142,15 @@ var ProfitPage = (function () {
     }
     html += '</td>';
 
-    /* Currency */
-    html += '<td style="font-size:var(--fs-sm);color:var(--text-muted);">' + Utils.escapeHtml(curr) + '</td>';
+    /* Currency (editable dropdown) */
+    html += '<td style="font-size:var(--fs-sm);">';
+    html += '<select class="fee-input" onchange="ProfitPage.updateCurrency(this,\'' + Utils.escapeHtml(b._fbKey || '') + '\')" ';
+    html += 'style="width:60px;padding:2px 4px;font-size:var(--fs-sm);border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-primary);">';
+    for (var ci = 0; ci < CURRENCY_OPTIONS.length; ci++) {
+      html += '<option value="' + CURRENCY_OPTIONS[ci].value + '"' + (CURRENCY_OPTIONS[ci].value === curr ? ' selected' : '') + '>' + Utils.escapeHtml(CURRENCY_OPTIONS[ci].value) + '</option>';
+    }
+    html += '</select>';
+    html += '</td>';
 
     html += '</tr>';
     return html;
@@ -217,6 +224,42 @@ var ProfitPage = (function () {
       }
     } catch (e) {
       console.error('[ProfitPage] updateChargeCompany error:', e);
+      Toast.show('更新失敗', 'error');
+    }
+  }
+
+  /* ===== Silent update: currency ===== */
+  function updateCurrency(selectEl, fbKey) {
+    try {
+      var newCurr = selectEl.value;
+      var updated = Bookings.update(fbKey, { currency: newCurr });
+      if (updated) {
+        var tr = selectEl.closest('tr');
+        if (tr) {
+          var curr = updated.currency || CURRENCY_DEFAULT;
+          var chargeGuest = Number(updated.chargeGuest) || 0;
+          var chargeCompany = Number(updated.chargeCompany) || 0;
+          var profit = chargeGuest - chargeCompany;
+          var isPaid = updated.feeStatus === FEE_TYPES.PAID;
+
+          /* Update charge guest cell */
+          var cgCell = tr.querySelector('.cell-cg');
+          if (cgCell && isPaid) {
+            cgCell.textContent = Utils.formatCurrency(chargeGuest, curr);
+          }
+
+          /* Update profit cell */
+          var profitCell = tr.querySelector('.cell-profit');
+          if (profitCell && isPaid) {
+            profitCell.style.fontWeight = '700';
+            profitCell.style.color = profit > 0 ? 'var(--color-success)' : profit < 0 ? 'var(--color-danger)' : '';
+            profitCell.textContent = Utils.formatCurrency(profit, curr);
+          }
+        }
+        Toast.show('幣別已更新', 'success');
+      }
+    } catch (e) {
+      console.error('[ProfitPage] updateCurrency error:', e);
       Toast.show('更新失敗', 'error');
     }
   }
@@ -297,6 +340,7 @@ var ProfitPage = (function () {
   return {
     render: render,
     updateChargeCompany: updateChargeCompany,
+    updateCurrency: updateCurrency,
     setFilter: setFilter
   };
 })();
