@@ -546,6 +546,7 @@ var cache = {
   hotelConfig: null,
   agentList: null,
   employeeList: null,
+  closedMonths: null,
   lastRefresh: 0,
   refreshing: false  /* Prevents concurrent refresh calls */
 };
@@ -558,7 +559,7 @@ function refreshCache(callback) {
   }
   cache.refreshing = true;
 
-  var pending = 3;
+  var pending = 4;
   var done = false;
 
   function checkDone() {
@@ -595,6 +596,14 @@ function refreshCache(callback) {
     }
     checkDone();
   });
+
+  /* Fetch closed months (for seal check) */
+  fbGet(CONFIG.FIREBASE.PATHS.CLOSED_MONTHS, function (err, data) {
+    if (!err && data) {
+      cache.closedMonths = data;
+    }
+    checkDone();
+  });
 }
 
 /**
@@ -608,6 +617,25 @@ function ensureCacheFresh(callback) {
   }
   /* Always proceed immediately with current (possibly stale) cache */
   if (callback) callback();
+}
+
+/**
+ * Check if a month is sealed (closed for editing).
+ * Uses cached closedMonths data from Firebase.
+ * Handles both array format {0: "2026-06"} and object format {"2026-06": true}.
+ */
+function isMonthSealed(monthStr) {
+  if (!monthStr || !cache.closedMonths) return false;
+  for (var key in cache.closedMonths) {
+    if (cache.closedMonths.hasOwnProperty(key)) {
+      var val = cache.closedMonths[key];
+      /* Array format: {0: "2026-06"} → value is the month string */
+      if (val === monthStr) return true;
+      /* Object format: {"2026-06": true} → key is the month string */
+      if (key === monthStr && val) return true;
+    }
+  }
+  return false;
 }
 
 /* Hotel config helpers (from cache) */
@@ -1646,6 +1674,17 @@ function showBookingConfirm(chatId, session) {
 /* Submit booking to Firebase */
 function submitBooking(chatId, userId, session, user) {
   var d = session.data;
+
+  /* Seal check — prevent creating bookings for sealed months */
+  if (d.checkOut && isMonthSealed(getMonthStr(d.checkOut))) {
+    sendMessage(chatId,
+      '⛔ 此月份已封存，无法新增订房。\n请联络管理员解封后再操作。',
+      mainMenuKB(getEmployeeByTgId(userId))
+    );
+    clearSession(userId);
+    return;
+  }
+
   var now = Date.now();
   var fbKey = generateFbKey();
 
@@ -1832,6 +1871,16 @@ function handleConfirmNoInput(userId, chatId, text) {
       return;
     }
 
+    /* Seal check */
+    if (booking.checkOut && isMonthSealed(getMonthStr(booking.checkOut))) {
+      sendMessage(chatId,
+        '⛔ 此月份已封存，无法修改订房。',
+        mainMenuKB(getEmployeeByTgId(userId))
+      );
+      clearSession(userId);
+      return;
+    }
+
     /* Update fields */
     booking.confirmNo = confirmNo;
     booking.status = BOOKING_STATUS.CONFIRMED;
@@ -2013,6 +2062,14 @@ function executeBulkConfirmNo(userId, chatId, matches) {
         return;
       }
 
+      /* Seal check — skip sealed months */
+      if (booking.checkOut && isMonthSealed(getMonthStr(booking.checkOut))) {
+        failed++;
+        results.push({ ok: false, guestName: m.booking.guestName, confirmNo: m.confirmNo });
+        processOne(idx + 1);
+        return;
+      }
+
       booking.confirmNo = m.confirmNo;
       booking.status = BOOKING_STATUS.CONFIRMED;
       booking._updatedAt = Date.now();
@@ -2156,6 +2213,16 @@ function handleModifyInput(userId, chatId, text) {
   var fbKey = session.data.selectedBookingKey;
   var booking = session.data.bookingSnapshot;
   var value = text.trim();
+
+  /* Seal check */
+  if (booking && booking.checkOut && isMonthSealed(getMonthStr(booking.checkOut))) {
+    sendMessage(chatId,
+      '⛔ 此月份已封存，无法修改订房。',
+      mainMenuKB(getEmployeeByTgId(userId))
+    );
+    clearSession(userId);
+    return;
+  }
 
   var updateData = {};
 
@@ -2345,6 +2412,16 @@ function executeCancel(chatId, userId, fbKey) {
   fbGet(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), function (err, booking) {
     if (err || !booking) {
       sendMessage(chatId, '❌ 找不到该订房记录。', mainMenuKB(getEmployeeByTgId(userId)));
+      clearSession(userId);
+      return;
+    }
+
+    /* Seal check */
+    if (booking.checkOut && isMonthSealed(getMonthStr(booking.checkOut))) {
+      sendMessage(chatId,
+        '⛔ 此月份已封存，无法取消订房。',
+        mainMenuKB(getEmployeeByTgId(userId))
+      );
       clearSession(userId);
       return;
     }

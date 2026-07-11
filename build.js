@@ -345,16 +345,16 @@ function runTests() {
     assert(tpl.indexOf('#f0f2f5') !== -1, 'Should use light theme-color #f0f2f5');
   });
 
-  test('Template version label is v2.1.0', function () {
+  test('Template version label is v2.1.6', function () {
     var tpl = readFile(TEMPLATE);
-    assert(tpl.indexOf('v2.1.0') !== -1, 'Version label should be v2.1.0');
+    assert(tpl.indexOf('v2.1.6') !== -1, 'Version label should be v2.1.6');
   });
 
   /* ===== Test: constants.js defines required constants ===== */
   test('constants.js defines APP', function () {
     var src = getSrc('src/core/constants.js');
     assert(src.indexOf('var APP') !== -1, 'Missing APP');
-    assert(src.indexOf("VERSION: '2.1.0'") !== -1, 'APP.VERSION should be 2.1.0');
+    assert(src.indexOf("VERSION: '2.1.6'") !== -1, 'APP.VERSION should be 2.1.6');
   });
 
   test('constants.js defines CONFIG with v8 settings', function () {
@@ -519,6 +519,63 @@ function runTests() {
     assert(src.indexOf('archives') !== -1, 'Missing archives state');
     assert(src.indexOf('closedMonths') !== -1, 'Missing closedMonths state');
     assert(src.indexOf('settings') !== -1, 'Missing settings state');
+  });
+
+  /* ===== Test: Month sealing (v2.1.6) ===== */
+  test('state.js defines sealMonth and unsealMonth', function () {
+    var src = getSrc('src/core/state.js');
+    assert(src.indexOf('sealMonth') !== -1, 'Missing sealMonth()');
+    assert(src.indexOf('unsealMonth') !== -1, 'Missing unsealMonth()');
+    assert(src.indexOf('isMonthClosed') !== -1, 'Missing isMonthClosed()');
+  });
+
+  test('state.js sealMonth syncs to Firebase', function () {
+    var src = getSrc('src/core/state.js');
+    assert(src.indexOf('syncClosedMonthsToFirebase') !== -1, 'sealMonth should call syncClosedMonthsToFirebase');
+  });
+
+  test('app.js defines _autoSealPastMonths', function () {
+    var src = getSrc('src/core/app.js');
+    assert(src.indexOf('_autoSealPastMonths') !== -1, 'Missing _autoSealPastMonths()');
+  });
+
+  test('app.js listens to MONTH_CLOSED event', function () {
+    var src = getSrc('src/core/app.js');
+    assert(src.indexOf('MONTH_CLOSED') !== -1, 'Missing MONTH_CLOSED event listener');
+  });
+
+  test('overview.js defines _buildSealLabel', function () {
+    var src = getSrc('src/pages/overview.js');
+    assert(src.indexOf('_buildSealLabel') !== -1, 'Missing _buildSealLabel()');
+  });
+
+  test('bridge.js defines sealMonthAction and unsealMonthAction', function () {
+    var src = getSrc('src/bridge/bridge.js');
+    assert(src.indexOf('function sealMonthAction') !== -1, 'Missing sealMonthAction()');
+    assert(src.indexOf('function unsealMonthAction') !== -1, 'Missing unsealMonthAction()');
+  });
+
+  test('bridge.js saveBookingForm has seal check', function () {
+    var src = getSrc('src/bridge/bridge.js');
+    assert(src.indexOf('isMonthClosed') !== -1, 'saveBookingForm should check isMonthClosed');
+  });
+
+  test('fees.js has seal check in update functions', function () {
+    var src = getSrc('src/pages/fees.js');
+    assert(src.indexOf('isMonthClosed') !== -1, 'fees.js should check isMonthClosed');
+  });
+
+  test('profit.js has seal check in update functions', function () {
+    var src = getSrc('src/pages/profit.js');
+    assert(src.indexOf('isMonthClosed') !== -1, 'profit.js should check isMonthClosed');
+  });
+
+  test('bot.js defines isMonthSealed helper', function () {
+    var botPath = path.join(ROOT, 'bot', 'bot.js');
+    assert(fs.existsSync(botPath), 'bot.js not found');
+    var src = readFile(botPath);
+    assert(src.indexOf('isMonthSealed') !== -1, 'Missing isMonthSealed() in bot.js');
+    assert(src.indexOf('closedMonths') !== -1, 'Missing closedMonths in bot cache');
   });
 
   /* ===== Test: store.js defines Store module ===== */
@@ -804,6 +861,17 @@ function runTests() {
         var msg = (e.stderr && e.stderr.toString()) || e.message;
         throw new Error(JS_FILES[i] + ': ' + msg.trim());
       }
+    }
+  });
+
+  test('No syntax errors in bot.js (node -c)', function () {
+    var execSync = require('child_process').execSync;
+    var botPath = path.join(ROOT, 'bot', 'bot.js');
+    try {
+      execSync('node -c "' + botPath + '"', { stdio: 'pipe' });
+    } catch (e) {
+      var msg = (e.stderr && e.stderr.toString()) || e.message;
+      throw new Error('bot/bot.js: ' + msg.trim());
     }
   });
 

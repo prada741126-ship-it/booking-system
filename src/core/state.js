@@ -79,6 +79,42 @@ var State = (function () {
     return _state.closedMonths.indexOf(monthStr) !== -1;
   }
 
+  /* ===== 月結封存 ===== */
+
+  function sealMonth(monthStr) {
+    if (!monthStr) return false;
+    if (_state.closedMonths.indexOf(monthStr) !== -1) return false;
+    _state.closedMonths.push(monthStr);
+    _state.closedMonths.sort();
+    Store.saveClosedMonths(_state.closedMonths);
+    Events.emit(EVENTS.MONTH_CLOSED, _state.closedMonths);
+    console.log('[State] Month sealed:', monthStr);
+    /* Sync to Firebase */
+    if (typeof syncClosedMonthsToFirebase === 'function') {
+      syncClosedMonthsToFirebase(_state.closedMonths, function (err) {
+        if (err) console.error('[State] syncClosedMonthsToFirebase error:', err);
+      });
+    }
+    return true;
+  }
+
+  function unsealMonth(monthStr) {
+    if (!monthStr) return false;
+    var idx = _state.closedMonths.indexOf(monthStr);
+    if (idx === -1) return false;
+    _state.closedMonths.splice(idx, 1);
+    Store.saveClosedMonths(_state.closedMonths);
+    Events.emit(EVENTS.MONTH_CLOSED, _state.closedMonths);
+    console.log('[State] Month unsealed:', monthStr);
+    /* Sync to Firebase */
+    if (typeof syncClosedMonthsToFirebase === 'function') {
+      syncClosedMonthsToFirebase(_state.closedMonths, function (err) {
+        if (err) console.error('[State] syncClosedMonthsToFirebase error:', err);
+      });
+    }
+    return true;
+  }
+
   function getSettings() {
     return _state.settings || {};
   }
@@ -119,6 +155,8 @@ var State = (function () {
     getHotelConfig: getHotelConfig,
     getWorkingMonth: getWorkingMonth,
     isMonthClosed: isMonthClosed,
+    sealMonth: sealMonth,
+    unsealMonth: unsealMonth,
     getSettings: getSettings,
     getRoomFeeRate: getRoomFeeRate,
     setRoomFeeRate: setRoomFeeRate,

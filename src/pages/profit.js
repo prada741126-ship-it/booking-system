@@ -202,6 +202,12 @@ var ProfitPage = (function () {
   /* ===== Silent update: chargeCompany ===== */
   function updateChargeCompany(inputEl, fbKey) {
     try {
+      /* Seal check */
+      var _sc = Bookings.getByKey(fbKey);
+      if (_sc && _sc.checkOut && State.isMonthClosed(_sc.checkOut.slice(0, 7))) {
+        Toast.warning('此月份已封存，不可修改');
+        return;
+      }
       var num = Number(inputEl.value) || 0;
       var updated = Bookings.update(fbKey, { chargeCompany: num });
       if (updated) {
@@ -231,6 +237,12 @@ var ProfitPage = (function () {
   /* ===== Silent update: currency ===== */
   function updateCurrency(selectEl, fbKey) {
     try {
+      /* Seal check */
+      var _sc = Bookings.getByKey(fbKey);
+      if (_sc && _sc.checkOut && State.isMonthClosed(_sc.checkOut.slice(0, 7))) {
+        Toast.warning('此月份已封存，不可修改');
+        return;
+      }
       var newCurr = selectEl.value;
       var updated = Bookings.update(fbKey, { currency: newCurr });
       if (updated) {

@@ -251,6 +251,12 @@ function saveBookingForm() {
   if (!data.casino) { Toast.error('\u8acb\u9078\u64c7\u9ad4\u7cfb'); return; }
   if (!data.checkIn || !data.checkOut) { Toast.error('\u8acb\u9078\u64c7\u5165\u4f4f\u548c\u9000\u623f\u65e5\u671f'); return; }
 
+  /* Seal check — prevent saving if the booking's month is sealed */
+  if (data.checkOut && State.isMonthClosed(data.checkOut.slice(0, 7))) {
+    Toast.warning('此月份已封存，不可新增或修改訂房');
+    return;
+  }
+
   /* Check for duplicate (warn only) */
   var dups = Bookings.checkDuplicate(data.guestName, data.checkIn, data.casino);
   if (dups.length > 0 && !_editingBookingKey) {
@@ -274,6 +280,12 @@ function saveBookingForm() {
 function editBooking(fbKey) {
   var booking = Bookings.getByKey(fbKey);
   if (!booking) { Toast.error('\u627e\u4e0d\u5230\u8a02\u623f\u8a18\u9304'); return; }
+
+  /* Seal check — prevent editing if the booking's month is sealed */
+  if (booking.checkOut && State.isMonthClosed(booking.checkOut.slice(0, 7))) {
+    Toast.warning('此月份已封存，不可修改訂房');
+    return;
+  }
 
   /* Check edit permission */
   var rules = STATUS_RULES[booking.status] || { canEdit: true };
@@ -364,6 +376,12 @@ function viewBookingDetail(fbKey) {
 function deleteBooking(fbKey) {
   var b = Bookings.getByKey(fbKey);
   if (!b) return;
+
+  /* Seal check — prevent deletion if the booking's month is sealed */
+  if (b.checkOut && State.isMonthClosed(b.checkOut.slice(0, 7))) {
+    Toast.warning('此月份已封存，不可刪除訂房');
+    return;
+  }
 
   Modal.confirm(
     '\u78ba\u8a8d\u522a\u9664\u300c' + (b.guestName || '') + '\u300d\u7684\u8a02\u623f\u8a18\u9304\uff1f\u6b64\u64cd\u4f5c\u4e0d\u53ef\u64a4\u92b7\u3002',
@@ -603,5 +621,31 @@ function clearAllData() {
       Events.emit(EVENTS.UI_RENDER);
     },
     { title: '\u26a0\ufe0f \u5371\u96aa\u64cd\u4f5c', confirmText: '\u78ba\u8a8d\u6e05\u9664\u5168\u90e8' }
+  );
+}
+
+/* ============================================================
+ * Month Seal / Unseal Actions (v2.1.6)
+ * ============================================================ */
+
+function sealMonthAction(monthStr) {
+  Modal.confirm(
+    '\u78ba\u8a8d\u5c01\u5b58\u300c' + monthStr + '\u300d\u6708\u7d50\u8cc7\u6599\uff1f\u5c01\u5b58\u5f8c\u8a72\u6708\u4efd\u8a02\u623f\u5c07\u9396\u5b9a\uff0c\u4e0d\u53ef\u65b0\u589e\u3001\u4fee\u6539\u6216\u522a\u9664\u3002',
+    function () {
+      State.sealMonth(monthStr);
+      Toast.success(monthStr + ' \u5df2\u5c01\u5b58');
+    },
+    { title: '\u6708\u7d50\u5c01\u5b58', confirmText: '\u78ba\u8a8d\u5c01\u5b58' }
+  );
+}
+
+function unsealMonthAction(monthStr) {
+  Modal.confirm(
+    '\u26a0\ufe0f \u78ba\u8a8d\u89e3\u5c01\u300c' + monthStr + '\u300d\u6708\u7d50\u8cc7\u6599\uff1f\u89e3\u5c01\u5f8c\u8a72\u6708\u4efd\u8a02\u623f\u5c07\u53ef\u4ee5\u88ab\u4fee\u6539\uff0c\u8acb\u78ba\u8a8d\u662f\u5426\u771f\u7684\u9700\u8981\u89e3\u5c01\u3002',
+    function () {
+      State.unsealMonth(monthStr);
+      Toast.success(monthStr + ' \u5df2\u89e3\u5c01');
+    },
+    { title: '\u89e3\u5c01\u6708\u7d50', confirmText: '\u78ba\u8a8d\u89e3\u5c01' }
   );
 }

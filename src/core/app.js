@@ -178,6 +178,11 @@ var App = (function () {
       Events.emit(EVENTS.UI_RENDER, {});
     });
 
+    /* Month closed/opened -> re-render current page to update seal labels */
+    Events.on(EVENTS.MONTH_CLOSED, function () {
+      Events.emit(EVENTS.UI_RENDER, {});
+    });
+
     /* Update version label */
     var verEl = document.querySelector('.version-label');
     if (verEl) verEl.textContent = 'v' + APP.VERSION;
@@ -244,6 +249,35 @@ var App = (function () {
     }
     if (typeof syncDownloadAll === 'function') {
       syncDownloadAll();
+    }
+    /* Auto-seal past months after sync download completes */
+    setTimeout(function () {
+      _autoSealPastMonths();
+    }, 3000);
+  }
+
+  /* ===== Auto-seal: seal any past month that is not yet sealed ===== */
+  /* Rule: if current month is not the same as last month, and last month */
+  /* is not in closedMonths, auto-seal it. Actual trigger: next app open. */
+  function _autoSealPastMonths() {
+    try {
+      var currentMonth = Utils.currentMonth();
+      var closedMonths = State.get('closedMonths') || [];
+
+      /* Find the previous month string (YYYY-MM) */
+      var now = new Date();
+      var prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      var prevMonth = prevDate.getFullYear() + '-' +
+        String(prevDate.getMonth() + 1).padStart(2, '0');
+
+      /* Only seal if we are in a new month and the previous month is not sealed */
+      if (prevMonth !== currentMonth && closedMonths.indexOf(prevMonth) === -1) {
+        console.log('[App] Auto-sealing previous month:', prevMonth);
+        State.sealMonth(prevMonth);
+        Toast.info('已自動封存 ' + prevMonth + ' 月結資料');
+      }
+    } catch (e) {
+      console.error('[App] Auto-seal error:', e);
     }
   }
 

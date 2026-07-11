@@ -252,6 +252,12 @@ var FeesPage = (function () {
   /* ===== Silent update: volume ===== */
   function updateVolume(inputEl, fbKey) {
     try {
+      /* Seal check */
+      var _sc = Bookings.getByKey(fbKey);
+      if (_sc && _sc.checkOut && State.isMonthClosed(_sc.checkOut.slice(0, 7))) {
+        Toast.warning('此月份已封存，不可修改');
+        return;
+      }
       var wanValue = Number(inputEl.value) || 0;
       if (wanValue < 0) wanValue = 0;
       var volume = wanValue * 10000;
@@ -271,6 +277,12 @@ var FeesPage = (function () {
   /* ===== Silent update: chargeGuest ===== */
   function updateChargeGuest(inputEl, fbKey) {
     try {
+      /* Seal check */
+      var _sc = Bookings.getByKey(fbKey);
+      if (_sc && _sc.checkOut && State.isMonthClosed(_sc.checkOut.slice(0, 7))) {
+        Toast.warning('此月份已封存，不可修改');
+        return;
+      }
       var num = Number(inputEl.value) || 0;
       var updated = Bookings.update(fbKey, { chargeGuest: num });
       if (updated) {
@@ -438,6 +450,12 @@ var FeesPage = (function () {
 
   /* ===== Manual toggle fee status (no auto-determine) ===== */
   function toggleFee(fbKey, newFee) {
+    /* Seal check */
+    var _sc = Bookings.getByKey(fbKey);
+    if (_sc && _sc.checkOut && State.isMonthClosed(_sc.checkOut.slice(0, 7))) {
+      Toast.warning('此月份已封存，不可修改');
+      return;
+    }
     var data = { feeStatus: newFee };
     if (newFee === FEE_TYPES.FREE) {
       data.chargeGuest = 0;

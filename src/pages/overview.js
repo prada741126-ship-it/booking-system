@@ -24,8 +24,9 @@ var OverviewPage = (function () {
     var html = '';
 
     /* Page header */
+    var sealLabel = _buildSealLabel(month);
     html += '<div class="page-header">';
-    html += '  <h3>總覽 — ' + month + '</h3>';
+    html += '  <h3>總覽 — ' + month + sealLabel + '</h3>';
     html += '  <div class="page-actions">';
     html += '    <button class="btn btn-secondary" onclick="window.print()">';
     html += '      <svg viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>';
@@ -108,6 +109,30 @@ var OverviewPage = (function () {
     html += '</div>';
 
     container.innerHTML = html;
+  }
+
+  /* ===== Build seal/unseal label for the page header ===== */
+  /* Current month: no label */
+  /* Past month not sealed: gray "封存" clickable label */
+  /* Sealed month: green "已封存" + "解封" link */
+  function _buildSealLabel(month) {
+    var currentMonth = Utils.currentMonth();
+    if (month === currentMonth) return '';
+
+    if (State.isMonthClosed(month)) {
+      /* Sealed: green badge + unseal link */
+      return ' <span style="display:inline-block;padding:2px 8px;border-radius:var(--radius-full);' +
+        'background:rgba(22,163,74,0.1);color:#16a34a;font-size:var(--fs-xs);font-weight:600;' +
+        'margin-left:var(--sp-2);vertical-align:middle;">已封存</span>' +
+        ' <a href="javascript:void(0)" onclick="unsealMonthAction(\'' + month + '\')" ' +
+        'style="font-size:var(--fs-xs);color:var(--text-muted);margin-left:4px;text-decoration:underline;">解封</a>';
+    }
+
+    /* Past month not sealed: gray "封存" clickable label */
+    return ' <a href="javascript:void(0)" onclick="sealMonthAction(\'' + month + '\')" ' +
+      'style="display:inline-block;padding:2px 8px;border-radius:var(--radius-full);' +
+      'background:var(--bg-base);color:var(--text-muted);font-size:var(--fs-xs);font-weight:500;' +
+      'margin-left:var(--sp-2);vertical-align:middle;text-decoration:none;">封存</a>';
   }
 
   function _kpiCard(colorClass, label, value, unit, sub, iconSvg, large) {
