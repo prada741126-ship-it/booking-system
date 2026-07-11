@@ -345,16 +345,16 @@ function runTests() {
     assert(tpl.indexOf('#f0f2f5') !== -1, 'Should use light theme-color #f0f2f5');
   });
 
-  test('Template version label is v2.1.7', function () {
+  test('Template version label is v2.1.8', function () {
     var tpl = readFile(TEMPLATE);
-    assert(tpl.indexOf('v2.1.7') !== -1, 'Version label should be v2.1.7');
+    assert(tpl.indexOf('v2.1.8') !== -1, 'Version label should be v2.1.8');
   });
 
   /* ===== Test: constants.js defines required constants ===== */
   test('constants.js defines APP', function () {
     var src = getSrc('src/core/constants.js');
     assert(src.indexOf('var APP') !== -1, 'Missing APP');
-    assert(src.indexOf("VERSION: '2.1.7'") !== -1, 'APP.VERSION should be 2.1.7');
+    assert(src.indexOf("VERSION: '2.1.8'") !== -1, 'APP.VERSION should be 2.1.8');
   });
 
   test('constants.js defines CONFIG with v8 settings', function () {
@@ -576,6 +576,15 @@ function runTests() {
     var src = readFile(botPath);
     assert(src.indexOf('isMonthSealed') !== -1, 'Missing isMonthSealed() in bot.js');
     assert(src.indexOf('closedMonths') !== -1, 'Missing closedMonths in bot cache');
+  });
+
+  test('bot.js defines today check-in reminder functions', function () {
+    var botPath = path.join(ROOT, 'bot', 'bot.js');
+    var src = readFile(botPath);
+    assert(src.indexOf('sendTodayCheckInReminders') !== -1, 'Missing sendTodayCheckInReminders() in bot.js');
+    assert(src.indexOf('startTodayCheckIn') !== -1, 'Missing startTodayCheckIn() in bot.js');
+    assert(src.indexOf('cmd_today_checkin') !== -1, 'Missing cmd_today_checkin callback handler');
+    assert(src.indexOf('/todaycheckin') !== -1, 'Missing /todaycheckin command');
   });
 
   /* ===== Test: store.js defines Store module ===== */

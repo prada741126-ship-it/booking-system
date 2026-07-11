@@ -202,6 +202,7 @@ function answerCallback(callbackId, text) {
 /* Set bot commands menu (English commands only, Chinese descriptions) */
 function setBotCommands() {
   var commands = [
+    { command: 'todaycheckin', description: '查看今日入住名单' },
     { command: 'newauth',   description: '管理员授权新员工 [管理员]' },
     { command: 'book',      description: '开始订房流程' },
     { command: 'confirmno', description: '填入确认编号（支持批量粘贴）' },
@@ -1363,6 +1364,7 @@ function _autoRegisterAdmin(user) {
 
 function mainMenuKB(emp) {
   var rows = [
+    [{ text: '🔑 今日入住', callback_data: 'cmd_today_checkin' }],
     [{ text: '📝 订房', callback_data: 'cmd_book' }],
     [
       { text: '✅ 确认号', callback_data: 'cmd_confirmno' },
@@ -1382,6 +1384,7 @@ function mainMenuKB(emp) {
 function handleHelp(msg) {
   var chatId = msg.chat.id;
   var text = '<b>BookingHub Bot 使用说明</b>\n\n';
+  text += '🔑 <b>/今日入住</b> — 查看今日入住名单\n';
   text += '📝 <b>/订房</b> — 贴上订房文字或逐步按钮选择\n';
   text += '✅ <b>/确认号</b> — 填入公关回复的确认编号\n';
   text += '  💡 批量确认号：直接把公关的统一回复粘贴/转发给 Bot，会自动识别并匹配\n';
@@ -2739,6 +2742,7 @@ function handleCallback(cb) {
     if (data === 'cmd_modify') { startModify(userId, chatId, user); return; }
     if (data === 'cmd_cancel') { startCancel(userId, chatId, user); return; }
     if (data === 'cmd_query') { startQuery(userId, chatId, user); return; }
+    if (data === 'cmd_today_checkin') { startTodayCheckIn(userId, chatId, user); return; }
     if (data === 'cmd_newauth') { startNewAuth(userId, chatId, user); return; }
 
     /* Booking flow callbacks */
@@ -3070,6 +3074,13 @@ function handleText(msg) {
     return;
   }
 
+  if (cmd === '/今日入住' || cmd === '/todaycheckin') {
+    checkAuth(msg, function (ok) {
+      if (ok) startTodayCheckIn(userId, chatId, msg.from);
+    });
+    return;
+  }
+
   if (cmd === '/help') {
     handleHelp(msg);
     return;
@@ -3374,6 +3385,9 @@ function dailyScan() {
 
     /* After scan, check reminders */
     checkReminders(data);
+
+    /* After scan, send today's check-in reminders to all employees */
+    sendTodayCheckInReminders(data);
   });
 }
 
@@ -3443,6 +3457,142 @@ function checkReminders(bookingsData) {
   } else {
     console.log('[Reminder] No reminders needed.');
   }
+}
+
+/* ============================================================
+ * Today Check-in Reminder — Push to All Active Employees
+ * ============================================================ */
+
+/**
+ * Send today's check-in list to all active employees.
+ * Called after dailyScan() completes.
+ * Only non-archived, non-cancelled bookings with checkIn === today.
+ */
+function sendTodayCheckInReminders(bookingsData) {
+  console.log('[TodayCheckIn] Checking today\'s check-ins...');
+
+  var todayStr = today();
+  var todayBookings = [];
+
+  for (var key in bookingsData) {
+    if (!bookingsData.hasOwnProperty(key)) continue;
+    var b = bookingsData[key];
+    if (!b || b._deleted || b.archived) continue;
+    if (b.status === BOOKING_STATUS.CANCELLED) continue;
+    if (b.checkIn === todayStr) {
+      todayBookings.push(b);
+    }
+  }
+
+  if (todayBookings.length === 0) {
+    console.log('[TodayCheckIn] No check-ins today.');
+    return;
+  }
+
+  /* Sort by guest name */
+  todayBookings.sort(function (a, b) {
+    return (a.guestName || '').localeCompare(b.guestName || '');
+  });
+
+  /* Build message */
+  var text = '🔑 <b>今日入住提醒</b>\n\n';
+  text += '今日共有 <b>' + todayBookings.length + '</b> 笔入住：\n\n';
+
+  for (var i = 0; i < todayBookings.length; i++) {
+    var b = todayBookings[i];
+    var icon = STATUS_ICONS[b.status] || '📋';
+    text += (i + 1) + '. ' + icon + ' <b>' + escapeHtml(b.guestName || '-') + '</b>\n';
+    text += '   🏨 ' + (b.casino || '') + ' / ' + (b.hotel || '') + ' / ' + getRoomLabel(b.roomType) + '\n';
+    text += '   📅 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?') + ' (' + (b.nights || 0) + '晚)\n';
+    if (b.confirmNo) text += '   🔢 确认号：<code>' + escapeHtml(b.confirmNo) + '</code>\n';
+    if (b.agent) text += '   👤 代理：' + escapeHtml(b.agent) + '\n';
+    if (b.smoking === 'smoking') text += '   🚬 吸烟房\n';
+    if (b.pickupName) text += '   🪧 举牌：' + escapeHtml(b.pickupName) + '\n';
+    if (b.remark) text += '   📝 备注：' + escapeHtml(b.remark) + '\n';
+    text += '\n';
+  }
+
+  text += '请准备接待客人，协助办理入住手续。';
+
+  /* Send to all active employees */
+  var sentCount = 0;
+  if (cache.employeeList) {
+    for (var empKey in cache.employeeList) {
+      if (!cache.employeeList.hasOwnProperty(empKey)) continue;
+      var emp = cache.employeeList[empKey];
+      if (emp && emp.active !== false && emp.tgId) {
+        sendMessage(emp.tgId, text);
+        sentCount++;
+      }
+    }
+  }
+
+  console.log('[TodayCheckIn] Sent to', sentCount, 'employees,', todayBookings.length, 'check-ins today');
+
+  writeBotLog({
+    _fbKey: generateFbKey(),
+    _createdAt: Date.now(),
+    action: 'today_checkin_reminder',
+    message: 'Today check-in: ' + todayBookings.length + ' bookings, sent to ' + sentCount + ' employees'
+  });
+}
+
+/* ============================================================
+ * /今日入住 — On-Demand Today Check-in Query
+ * ============================================================ */
+
+function startTodayCheckIn(userId, chatId, user) {
+  var emp = getEmployeeByTgId(user.id);
+
+  sendMessage(chatId, '⏳ 正在查询今日入住...');
+
+  fbGet(CONFIG.FIREBASE.PATHS.BOOKINGS, function (err, data) {
+    if (err || !data) {
+      sendMessage(chatId, '查询失败或暂无订房记录。', mainMenuKB(emp));
+      return;
+    }
+
+    var todayStr = today();
+    var todayBookings = [];
+
+    for (var key in data) {
+      if (!data.hasOwnProperty(key)) continue;
+      var b = data[key];
+      if (!b || b._deleted || b.archived) continue;
+      if (b.status === BOOKING_STATUS.CANCELLED) continue;
+      if (b.checkIn === todayStr) {
+        todayBookings.push(b);
+      }
+    }
+
+    if (todayBookings.length === 0) {
+      sendMessage(chatId, '📭 今日无入住安排。', mainMenuKB(emp));
+      return;
+    }
+
+    todayBookings.sort(function (a, b) {
+      return (a.guestName || '').localeCompare(b.guestName || '');
+    });
+
+    var text = '🔑 <b>今日入住</b>\n\n';
+    text += '今日共有 <b>' + todayBookings.length + '</b> 笔入住：\n\n';
+
+    for (var i = 0; i < todayBookings.length; i++) {
+      var b = todayBookings[i];
+      var icon = STATUS_ICONS[b.status] || '📋';
+      text += (i + 1) + '. ' + icon + ' <b>' + escapeHtml(b.guestName || '-') + '</b>\n';
+      text += '   🏨 ' + (b.casino || '') + ' / ' + (b.hotel || '') + ' / ' + getRoomLabel(b.roomType) + '\n';
+      text += '   📅 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?') + ' (' + (b.nights || 0) + '晚)\n';
+      if (b.confirmNo) text += '   🔢 确认号：<code>' + escapeHtml(b.confirmNo) + '</code>\n';
+      if (b.agent) text += '   👤 代理：' + escapeHtml(b.agent) + '\n';
+      if (b.smoking === 'smoking') text += '   🚬 吸烟房\n';
+      if (b.pickupName) text += '   🪧 举牌：' + escapeHtml(b.pickupName) + '\n';
+      if (b.remark) text += '   📝 备注：' + escapeHtml(b.remark) + '\n';
+      text += '\n';
+    }
+
+    sendMessage(chatId, text, mainMenuKB(emp));
+  });
 }
 
 /* ============================================================
