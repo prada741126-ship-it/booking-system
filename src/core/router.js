@@ -1,20 +1,87 @@
 /**
  * router.js — Page routing
  * v8: 7 pages (总览/利润结算/费用收取/代理业绩/历史核账/员工管理/酒店设定)
+ * v2.1.7: Skeleton screen on page switch to eliminate flash
  */
 var Router = (function () {
 
+  /* Timer for deferred render (prevents rapid-click duplicate renders) */
+  var _navTimer = null;
+
+  /* Build skeleton placeholder HTML for a page */
+  function _buildSkeleton(pageId) {
+    var html = '<div class="skeleton-page">';
+
+    /* Title placeholder */
+    html += '<div class="skeleton-header"><div class="skeleton"></div></div>';
+
+    /* Pages with KPI cards: overview, profit, fees, agent-performance */
+    var hasKpi = (pageId === 'overview' || pageId === 'profit' ||
+                   pageId === 'fees' || pageId === 'agent-performance');
+    if (hasKpi) {
+      html += '<div class="skeleton-kpi-grid">';
+      for (var i = 0; i < 4; i++) {
+        html += '<div class="skeleton-kpi-card">';
+        html += '  <div class="skeleton skeleton-bar label"></div>';
+        html += '  <div class="skeleton skeleton-bar value"></div>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+
+    /* Pages with table: overview, profit, fees, agent-performance, archives */
+    var hasTable = (pageId !== 'employees' && pageId !== 'hotel-config');
+    if (hasTable) {
+      html += '<div class="skeleton-table">';
+      html += '  <div class="skeleton-table-head">';
+      for (var j = 0; j < 5; j++) {
+        html += '  <div class="skeleton skeleton-bar"></div>';
+      }
+      html += '  </div>';
+      for (var r = 0; r < 6; r++) {
+        html += '  <div class="skeleton-table-row">';
+        for (var c = 0; c < 5; c++) {
+          html += '  <div class="skeleton skeleton-bar"></div>';
+        }
+        html += '  </div>';
+      }
+      html += '</div>';
+    }
+
+    /* Pages with card list: employees, hotel-config */
+    if (pageId === 'employees' || pageId === 'hotel-config') {
+      html += '<div class="skeleton-card-list">';
+      for (var e = 0; e < 5; e++) {
+        html += '<div class="skeleton-card-item">';
+        html += '  <div class="skeleton skeleton-bar"></div>';
+        html += '  <div class="skeleton skeleton-bar"></div>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
   function navigateTo(pageId) {
     if (!pageId) return;
+    /* Cancel any pending deferred render (rapid page switching) */
+    if (_navTimer) {
+      clearTimeout(_navTimer);
+      _navTimer = null;
+    }
     /* Hide all pages */
     var pages = document.querySelectorAll('.page-content');
     for (var i = 0; i < pages.length; i++) {
       pages[i].classList.remove('active');
     }
-    /* Show target page */
+    /* Show target page with skeleton placeholder */
     var target = document.getElementById('page-' + pageId);
     if (target) {
       target.classList.add('active');
+      /* Inject skeleton immediately to prevent flash of old content */
+      target.innerHTML = _buildSkeleton(pageId);
     }
     /* Update nav items */
     var navItems = document.querySelectorAll('.nav-item[data-page]');
@@ -40,8 +107,12 @@ var Router = (function () {
     }
     /* Update state */
     State.set('currentPage', pageId);
-    /* Emit event for pages to render */
-    Events.emit(EVENTS.PAGE_CHANGED, { page: pageId });
+    /* Defer render by one event loop tick so skeleton is painted first */
+    /* This eliminates the flash of old/stale content during page switch */
+    _navTimer = setTimeout(function () {
+      _navTimer = null;
+      Events.emit(EVENTS.PAGE_CHANGED, { page: pageId });
+    }, 0);
     /* Close mobile sidebar */
     closeSidebar();
   }

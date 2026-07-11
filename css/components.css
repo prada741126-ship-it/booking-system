@@ -991,6 +991,138 @@ textarea.form-control {
   width: 60%;
 }
 
+/* ===== Page Skeleton (Loading Placeholder) ===== */
+.skeleton-page {
+  animation: skeletonFadeIn 0.15s var(--tr-fast);
+}
+
+@keyframes skeletonFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.skeleton-header {
+  margin-bottom: var(--sp-6);
+}
+
+.skeleton-header .skeleton {
+  height: 24px;
+  width: 180px;
+  border-radius: var(--radius-md);
+}
+
+.skeleton-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--kpi-card-min-w), 1fr));
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-6);
+}
+
+.skeleton-kpi-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4) var(--sp-5);
+  height: 92px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--sp-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.skeleton-kpi-card .skeleton-bar {
+  height: 14px;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-kpi-card .skeleton-bar.label {
+  width: 50%;
+}
+
+.skeleton-kpi-card .skeleton-bar.value {
+  width: 65%;
+  height: 22px;
+}
+
+.skeleton-table {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.skeleton-table-head {
+  display: flex;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-base);
+  border-bottom: 2px solid var(--border-default);
+}
+
+.skeleton-table-head .skeleton-bar {
+  height: 12px;
+  border-radius: var(--radius-sm);
+  flex: 1;
+  max-width: 100px;
+}
+
+.skeleton-table-row {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.skeleton-table-row:last-child {
+  border-bottom: none;
+}
+
+.skeleton-table-row .skeleton-bar {
+  height: 14px;
+  border-radius: var(--radius-sm);
+  flex: 1;
+  max-width: 120px;
+}
+
+/* Card list skeleton (employees, hotel-config, archives) */
+.skeleton-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.skeleton-card-item {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4);
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  box-shadow: var(--shadow-sm);
+}
+
+.skeleton-card-item .skeleton-bar {
+  height: 14px;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-card-item .skeleton-bar:first-child {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.skeleton-card-item .skeleton-bar:nth-child(2) {
+  flex: 1;
+  max-width: 200px;
+}
+
 /* ===== Loading Spinner ===== */
 .spinner {
   width: 20px;

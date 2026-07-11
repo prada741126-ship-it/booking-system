@@ -345,16 +345,16 @@ function runTests() {
     assert(tpl.indexOf('#f0f2f5') !== -1, 'Should use light theme-color #f0f2f5');
   });
 
-  test('Template version label is v2.1.6', function () {
+  test('Template version label is v2.1.7', function () {
     var tpl = readFile(TEMPLATE);
-    assert(tpl.indexOf('v2.1.6') !== -1, 'Version label should be v2.1.6');
+    assert(tpl.indexOf('v2.1.7') !== -1, 'Version label should be v2.1.7');
   });
 
   /* ===== Test: constants.js defines required constants ===== */
   test('constants.js defines APP', function () {
     var src = getSrc('src/core/constants.js');
     assert(src.indexOf('var APP') !== -1, 'Missing APP');
-    assert(src.indexOf("VERSION: '2.1.6'") !== -1, 'APP.VERSION should be 2.1.6');
+    assert(src.indexOf("VERSION: '2.1.7'") !== -1, 'APP.VERSION should be 2.1.7');
   });
 
   test('constants.js defines CONFIG with v8 settings', function () {
@@ -807,6 +807,23 @@ function runTests() {
     assert(src.indexOf('navigateTo:') !== -1, 'Missing navigateTo()');
     assert(src.indexOf('prevMonth:') !== -1, 'Missing prevMonth()');
     assert(src.indexOf('nextMonth:') !== -1, 'Missing nextMonth()');
+  });
+
+  test('router.js has skeleton screen on page switch', function () {
+    var src = getSrc('src/core/router.js');
+    assert(src.indexOf('_buildSkeleton') !== -1, 'Missing _buildSkeleton()');
+    assert(src.indexOf('skeleton-page') !== -1, 'Skeleton should use skeleton-page class');
+    assert(src.indexOf('setTimeout') !== -1, 'Missing setTimeout for deferred render');
+    assert(src.indexOf('_navTimer') !== -1, 'Missing _navTimer for rapid-click protection');
+  });
+
+  test('components.css has skeleton layout styles', function () {
+    var src = getSrc('css/components.css');
+    assert(src.indexOf('.skeleton-page') !== -1, 'Missing .skeleton-page');
+    assert(src.indexOf('.skeleton-kpi-grid') !== -1, 'Missing .skeleton-kpi-grid');
+    assert(src.indexOf('.skeleton-kpi-card') !== -1, 'Missing .skeleton-kpi-card');
+    assert(src.indexOf('.skeleton-table') !== -1, 'Missing .skeleton-table');
+    assert(src.indexOf('.skeleton-card-list') !== -1, 'Missing .skeleton-card-list');
   });
 
   /* ===== Test: CSS files have required selectors ===== */
