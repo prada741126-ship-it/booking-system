@@ -307,8 +307,8 @@ var FeesPage = (function () {
       remCell.innerHTML = _remainingHTML(remaining);
     }
 
-    /* Auto-determine fee status (only when volume > 0 and autoDetermine is true) */
-    if (autoDetermine && vol > 0) {
+    /* Auto-determine fee status (only when volume > 0, autoDetermine is true, and NOT manually overridden) */
+    if (autoDetermine && vol > 0 && !b.feeManualOverride) {
       var newFeeStatus = remaining > 0 ? FEE_TYPES.PAID : FEE_TYPES.FREE;
       if (b.feeStatus !== newFeeStatus) {
         var updateData = { feeStatus: newFeeStatus };
@@ -442,6 +442,19 @@ var FeesPage = (function () {
     if (newFee === FEE_TYPES.FREE) {
       data.chargeGuest = 0;
       data.chargeCompany = 0;
+      data.feeManualOverride = true;  /* 手動設免費 → 鎖定，不被自動覆蓋 */
+    } else {
+      /* 手動改回收費 → 清除鎖定，恢復自動計算 */
+      data.feeManualOverride = false;
+      var b = Bookings.getByKey(fbKey);
+      if (b) {
+        var th = Number(b.threshold) || 0;
+        var n = Number(b.nights) || 0;
+        var vol = Number(b.volume) || 0;
+        var disc = _calcDiscount(vol, th);
+        var rem = n - disc;
+        data.chargeGuest = _calcRoomFee(rem, th);
+      }
     }
     var updated = Bookings.update(fbKey, data);
     if (updated) {
