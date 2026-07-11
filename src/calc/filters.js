@@ -8,9 +8,39 @@
  *   added confirmNo/pickupName/employee/remark)
  * - Added: feeStatus/smoking/currency/employee filters
  * - Added: filterArchives() for archive records (uses finalStatus)
+ * - v2.1.4: Cross-month overlap filtering (bookings spanning two months
+ *   show in both months). Uses date overlap check instead of exact month match.
  */
 
 var Filters = {
+
+  /**
+   * Check if a booking's date range overlaps with a given month.
+   * A booking 7/30-8/2 overlaps with both '2026-07' and '2026-08'.
+   * Falls back to exact month field match if dates are missing.
+   * @param {string} checkIn - YYYY-MM-DD
+   * @param {string} checkOut - YYYY-MM-DD
+   * @param {string} bookingMonth - YYYY-MM (the booking's assigned month field)
+   * @param {string} filterMonth - YYYY-MM (the month being filtered)
+   * @returns {boolean} true if the booking overlaps with the filter month
+   */
+  overlapsMonth: function (checkIn, checkOut, bookingMonth, filterMonth) {
+    if (!filterMonth) return true;
+    /* If dates missing, fall back to exact month field match */
+    if (!checkIn || !checkOut) {
+      return bookingMonth === filterMonth;
+    }
+    /* Calculate month boundaries (string comparison works for YYYY-MM-DD) */
+    var monthStart = filterMonth + '-01';
+    var parts = filterMonth.split('-');
+    var year = parseInt(parts[0], 10);
+    var mon = parseInt(parts[1], 10);
+    var nextYear = mon === 12 ? year + 1 : year;
+    var nextMon = mon === 12 ? 1 : mon + 1;
+    var nextMonthStart = nextYear + '-' + String(nextMon).padStart(2, '0') + '-01';
+    /* Standard date overlap: checkIn < nextMonthStart AND checkOut > monthStart */
+    return checkIn < nextMonthStart && checkOut > monthStart;
+  },
 
   /**
    * Filter bookings by criteria
@@ -28,7 +58,8 @@ var Filters = {
 
     return bookings.filter(function (b) {
       /* Dimension filters */
-      if (criteria.month && b.month !== criteria.month) return false;
+      /* Month filter: cross-month overlap (v2.1.4) */
+      if (criteria.month && !Filters.overlapsMonth(b.checkIn, b.checkOut, b.month, criteria.month)) return false;
       if (criteria.casino && b.casino !== criteria.casino) return false;
       if (criteria.hotel && b.hotel !== criteria.hotel) return false;
       if (criteria.roomType && b.roomType !== criteria.roomType) return false;
@@ -85,7 +116,8 @@ var Filters = {
 
     return archives.filter(function (a) {
       /* Dimension filters */
-      if (criteria.month && a.month !== criteria.month) return false;
+      /* Month filter: cross-month overlap (v2.1.4) */
+      if (criteria.month && !Filters.overlapsMonth(a.checkIn, a.checkOut, a.month, criteria.month)) return false;
       if (criteria.casino && a.casino !== criteria.casino) return false;
       if (criteria.hotel && a.hotel !== criteria.hotel) return false;
       if (criteria.roomType && a.roomType !== criteria.roomType) return false;

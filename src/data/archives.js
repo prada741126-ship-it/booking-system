@@ -111,7 +111,7 @@ var Archives = {
     if (!filters) return list;
 
     return list.filter(function (a) {
-      if (filters.month && a.month !== filters.month) return false;
+      if (filters.month && !Filters.overlapsMonth(a.checkIn, a.checkOut, a.month, filters.month)) return false;
       if (filters.agent && a.agent !== filters.agent) return false;
       if (filters.casino && a.casino !== filters.casino) return false;
       if (filters.hotel && a.hotel !== filters.hotel) return false;
