@@ -37,6 +37,7 @@ var CONFIG = {
   TELEGRAM_TOKEN: _botToken,
 
   FIREBASE: {
+    API_KEY: 'AIzaSyC3NKqEVUpL-9WYvun7pBbJe8P7T8o4Y74',
     DB_URL: 'https://macau-app-default-rtdb.asia-southeast1.firebasedatabase.app',
     DB_HOST: 'macau-app-default-rtdb.asia-southeast1.firebasedatabase.app',
     PATHS: {
@@ -222,39 +223,49 @@ function setBotCommands() {
  * ============================================================ */
 
 function fbRequest(method, path, data, callback) {
-  var body = data ? JSON.stringify(data) : null;
-  var options = {
-    hostname: CONFIG.FIREBASE.DB_HOST,
-    path: '/' + path + '.json',
-    method: method,
-    headers: {}
-  };
-  if (body) {
-    options.headers['Content-Type'] = 'application/json';
-    options.headers['Content-Length'] = Buffer.byteLength(body);
-  }
+  ensureAuth(function (authErr) {
+    if (authErr) {
+      console.error('[FB] Auth failed, request aborted:', authErr);
+      if (callback) callback('Firebase auth failed: ' + String(authErr));
+      return;
+    }
 
-  var req = https.request(options, function (res) {
-    var chunks = '';
-    res.on('data', function (c) { chunks += c; });
-    res.on('end', function () {
-      try {
-        var json = JSON.parse(chunks);
-        if (callback) callback(null, json);
-      } catch (e) {
-        console.error('[FB] Parse error:', e.message);
-        if (callback) callback(e.message);
-      }
+    var authParam = authState.idToken ? '?auth=' + encodeURIComponent(authState.idToken) : '';
+
+    var body = data ? JSON.stringify(data) : null;
+    var options = {
+      hostname: CONFIG.FIREBASE.DB_HOST,
+      path: '/' + path + '.json' + authParam,
+      method: method,
+      headers: {}
+    };
+    if (body) {
+      options.headers['Content-Type'] = 'application/json';
+      options.headers['Content-Length'] = Buffer.byteLength(body);
+    }
+
+    var req = https.request(options, function (res) {
+      var chunks = '';
+      res.on('data', function (c) { chunks += c; });
+      res.on('end', function () {
+        try {
+          var json = JSON.parse(chunks);
+          if (callback) callback(null, json);
+        } catch (e) {
+          console.error('[FB] Parse error:', e.message);
+          if (callback) callback(e.message);
+        }
+      });
     });
-  });
 
-  req.on('error', function (e) {
-    console.error('[FB] Request error:', e.message);
-    if (callback) callback(e.message);
-  });
+    req.on('error', function (e) {
+      console.error('[FB] Request error:', e.message);
+      if (callback) callback(e.message);
+    });
 
-  if (body) req.write(body);
-  req.end();
+    if (body) req.write(body);
+    req.end();
+  });
 }
 
 function fbGet(path, callback) {
@@ -323,6 +334,208 @@ function writeBotLog(log, callback) {
     }
     if (callback) callback(err);
   });
+}
+
+/* ============================================================
+ * Firebase Anonymous Authentication
+ * ============================================================ */
+
+var authState = {
+  idToken: null,
+  refreshToken: null,
+  expiresAt: 0,
+  pendingCallbacks: [],
+  refreshing: false
+};
+
+/**
+ * Sign in anonymously via Firebase Identity Toolkit REST API.
+ * Returns { idToken, refreshToken, expiresIn } on success.
+ */
+function fbSignInAnonymously(callback) {
+  var body = JSON.stringify({ returnSecureToken: true });
+  var options = {
+    hostname: 'identitytoolkit.googleapis.com',
+    path: '/v1/accounts:signUp?key=' + CONFIG.FIREBASE.API_KEY,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body)
+    }
+  };
+
+  var req = https.request(options, function (res) {
+    var chunks = '';
+    res.on('data', function (c) { chunks += c; });
+    res.on('end', function () {
+      try {
+        var json = JSON.parse(chunks);
+        if (json.idToken) {
+          callback(null, {
+            idToken: json.idToken,
+            refreshToken: json.refreshToken,
+            expiresIn: json.expiresIn || '3600'
+          });
+        } else {
+          callback(json.error ? json.error.message : 'Unknown auth error');
+        }
+      } catch (e) {
+        callback('Auth parse error: ' + e.message);
+      }
+    });
+  });
+
+  req.on('error', function (e) {
+    callback('Auth request error: ' + e.message);
+  });
+
+  req.write(body);
+  req.end();
+}
+
+/**
+ * Refresh the ID token using the refresh token.
+ */
+function fbRefreshToken(callback) {
+  if (!authState.refreshToken) {
+    callback('No refresh token available');
+    return;
+  }
+
+  var body = JSON.stringify({
+    grant_type: 'refresh_token',
+    refresh_token: authState.refreshToken
+  });
+  var options = {
+    hostname: 'securetoken.googleapis.com',
+    path: '/v1/token?key=' + CONFIG.FIREBASE.API_KEY,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body)
+    }
+  };
+
+  var req = https.request(options, function (res) {
+    var chunks = '';
+    res.on('data', function (c) { chunks += c; });
+    res.on('end', function () {
+      try {
+        var json = JSON.parse(chunks);
+        if (json.id_token) {
+          callback(null, {
+            idToken: json.id_token,
+            refreshToken: json.refresh_token,
+            expiresIn: json.expires_in || '3600'
+          });
+        } else {
+          callback(json.error ? json.error.message : 'Unknown refresh error');
+        }
+      } catch (e) {
+        callback('Refresh parse error: ' + e.message);
+      }
+    });
+  });
+
+  req.on('error', function (e) {
+    callback('Refresh request error: ' + e.message);
+  });
+
+  req.write(body);
+  req.end();
+}
+
+/**
+ * Ensure we have a valid Firebase auth token.
+ * - If token is still valid, call callback immediately.
+ * - If token is expired but we have a refresh token, try refresh.
+ * - If no refresh token, do anonymous sign-in.
+ * - Prevents concurrent auth requests by queuing callbacks.
+ */
+function ensureAuth(callback) {
+  /* Token is valid for at least 5 more minutes — use it */
+  if (authState.idToken && Date.now() < authState.expiresAt - 300000) {
+    callback(null);
+    return;
+  }
+
+  /* Queue callback if already refreshing */
+  if (authState.refreshing) {
+    authState.pendingCallbacks.push(callback);
+    return;
+  }
+
+  authState.refreshing = true;
+
+  function done(err) {
+    /* Flush all pending callbacks */
+    var cbs = authState.pendingCallbacks.splice(0);
+    authState.refreshing = false;
+    callback(err);
+    for (var i = 0; i < cbs.length; i++) {
+      cbs[i](err);
+    }
+  }
+
+  /* Try refresh token first */
+  if (authState.refreshToken) {
+    fbRefreshToken(function (err, result) {
+      if (!err && result) {
+        authState.idToken = result.idToken;
+        authState.refreshToken = result.refreshToken;
+        authState.expiresAt = Date.now() + (parseInt(result.expiresIn, 10) || 3600) * 1000;
+        console.log('[Auth] Token refreshed, expires in ' + result.expiresIn + 's');
+        done(null);
+      } else {
+        console.error('[Auth] Refresh failed, signing in anonymously:', err);
+        /* Fall through to anonymous sign-in */
+        doAnonymousSignIn();
+      }
+    });
+  } else {
+    doAnonymousSignIn();
+  }
+
+  function doAnonymousSignIn() {
+    fbSignInAnonymously(function (err, result) {
+      if (err) {
+        console.error('[Auth] Anonymous sign-in failed:', err);
+        done(err);
+        return;
+      }
+      authState.idToken = result.idToken;
+      authState.refreshToken = result.refreshToken;
+      authState.expiresAt = Date.now() + (parseInt(result.expiresIn, 10) || 3600) * 1000;
+      console.log('[Auth] Anonymous sign-in successful, expires in ' + result.expiresIn + 's');
+      done(null);
+    });
+  }
+}
+
+/**
+ * Initialize Firebase Auth on startup.
+ * Returns immediately — auth happens async. All fbRequest calls
+ * will queue behind ensureAuth until the first token is obtained.
+ */
+function initFirebaseAuth() {
+  console.log('[Auth] Initializing Firebase anonymous authentication...');
+  ensureAuth(function (err) {
+    if (err) {
+      console.error('[Auth] Initial auth failed:', err);
+      console.error('[Auth] Bot will retry on next Firebase request.');
+    } else {
+      console.log('[Auth] Firebase auth initialized successfully.');
+    }
+  });
+
+  /* Refresh token every 50 minutes (tokens expire after 60 min) */
+  setInterval(function () {
+    ensureAuth(function (err) {
+      if (err) {
+        console.error('[Auth] Periodic refresh failed:', err);
+      }
+    });
+  }, 50 * 60 * 1000);
 }
 
 /* ============================================================
@@ -3346,6 +3559,10 @@ function start() {
 
     /* Set bot commands menu */
     setBotCommands();
+
+    /* Initialize Firebase Auth first, then refresh caches */
+    console.log('[Bot] Initializing Firebase Auth...');
+    initFirebaseAuth();
 
     /* Initial cache refresh */
     console.log('[Bot] Refreshing caches...');
