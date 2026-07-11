@@ -83,6 +83,24 @@ var State = (function () {
     return _state.settings || {};
   }
 
+  function getRoomFeeRate() {
+    var s = _state.settings || {};
+    var rate = Number(s.roomFeeRate);
+    if (!rate || rate <= 0) return ROOM_FEE_RATE_DEFAULT;
+    return rate;
+  }
+
+  function setRoomFeeRate(rate) {
+    var num = Number(rate) || 0;
+    if (num <= 0) num = ROOM_FEE_RATE_DEFAULT;
+    var settings = _state.settings || {};
+    settings.roomFeeRate = num;
+    settings._updatedAt = Date.now();
+    _state.settings = settings;
+    Store.saveSettings(settings);
+    Events.emit(EVENTS.SYNC_SETTINGS, settings);
+  }
+
   function getRecentAgents(employeeId) {
     var settings = _state.settings || {};
     var recentMap = settings.recentAgents || {};
@@ -102,6 +120,8 @@ var State = (function () {
     getWorkingMonth: getWorkingMonth,
     isMonthClosed: isMonthClosed,
     getSettings: getSettings,
+    getRoomFeeRate: getRoomFeeRate,
+    setRoomFeeRate: setRoomFeeRate,
     getRecentAgents: getRecentAgents
   };
 })();

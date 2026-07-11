@@ -68,6 +68,20 @@ var HotelConfigPage = (function () {
         '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>');
       html += '</div>';
 
+      /* Room fee rate setting */
+      var currentRate = State.getRoomFeeRate();
+      html += '<div class="card" style="margin-bottom:var(--sp-4);">';
+      html += '  <div class="card-title"><div class="card-icon"><svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg></div>房費費率設定</div>';
+      html += '  <div style="display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3) 0;">';
+      html += '    <span style="font-size:var(--fs-sm);color:var(--text-muted);">每 10 萬轉碼 = </span>';
+      html += '    <input type="number" min="1" step="1" value="' + currentRate + '" id="hc-room-fee-rate" ';
+      html += '      style="width:80px;text-align:center;padding:var(--sp-2);font-size:var(--fs-md);font-weight:600;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-primary);" ';
+      html += '      onchange="HotelConfigPage.updateRoomFeeRate(this.value)">';
+      html += '    <span style="font-size:var(--fs-sm);color:var(--text-muted);">元（港幣）</span>';
+      html += '    <span style="font-size:var(--fs-xs);color:var(--text-muted);margin-left:var(--sp-2);">向客人收 = (剩餘天數 × 每晚門檻 ÷ 10萬) × 費率</span>';
+      html += '  </div>';
+      html += '</div>';
+
       /* Tree view */
       html += '<div class="hc-tree">';
 
@@ -384,6 +398,11 @@ var HotelConfigPage = (function () {
     return html;
   }
 
+  function updateRoomFeeRate(rate) {
+    State.setRoomFeeRate(rate);
+    Toast.show('房費費率已更新為 ' + State.getRoomFeeRate() + ' 元');
+  }
+
   return {
     render: render,
     showAddCasino: showAddCasino,
@@ -402,7 +421,8 @@ var HotelConfigPage = (function () {
     showAddRoomType: showAddRoomType,
     confirmAddRoomType: confirmAddRoomType,
     confirmReset: confirmReset,
-    loadPresets: loadPresets
+    loadPresets: loadPresets,
+    updateRoomFeeRate: updateRoomFeeRate
   };
 })();
 

@@ -148,6 +148,13 @@ var App = (function () {
       console.error('[App] Sync error:', data);
     });
 
+    /* Settings changed -> sync to Firebase */
+    Events.on(EVENTS.SYNC_SETTINGS, function (settings) {
+      syncSettingsToFirebase(settings, function (err) {
+        if (err) console.error('[App] Settings sync error:', err);
+      });
+    });
+
     /* Loading overlay control */
     Events.on(EVENTS.UI_LOADING, function (data) {
       if (data && data.show) {

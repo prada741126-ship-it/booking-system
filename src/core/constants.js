@@ -125,6 +125,7 @@ var EVENTS = {
   SYNC_DOWNLOAD_DONE: 'sync:download_done',
   SYNC_ERROR:         'sync:error',
   SYNC_STATUS:        'sync:status',
+  SYNC_SETTINGS:      'sync:settings',
   /* Page events */
   PAGE_CHANGED:       'page:changed',
   /* UI events */
@@ -271,6 +272,10 @@ var STATUS_AUTO_TRANSITION = {
   /* checked-out & cancelled -> auto archive */
   toArchive: ['checked-out', 'cancelled']
 };
+
+/* ===== Room Fee Rate (auto-calc) ===== */
+var ROOM_FEE_RATE_DEFAULT = 150;       /* HKD per 100,000 rolling */
+var ROOM_FEE_UNIT = 100000;            /* 10萬 */
 
 /* ===== Fee Type (v8: only free or paid) ===== */
 var FEE_TYPES = {

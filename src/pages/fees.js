@@ -51,7 +51,8 @@ var FeesPage = (function () {
 
     /* Formula hint */
     html += '<div style="margin-bottom:var(--sp-2);color:var(--text-muted);font-size:var(--fs-xs);">';
-    html += '折抵天數 = 客戶轉碼 ÷ 每晚門檻（無條件退位）。剩餘天數 > 0 → 自動設為收費房；剩餘 = 0 → 自動設為免費房。可手動覆蓋。';
+    html += '折抵天數 = 客戶轉碼 ÷ 每晚門檻（無條件退位）。剩餘天數 > 0 → 自動設為收費房；剩餘 = 0 → 自動設為免費房。可手動覆蓋。<br>';
+    html += '向客人收 = (剩餘天數 × 每晚門檻 ÷ 10萬) × ' + State.getRoomFeeRate() + ' 元（自動帶入，可手動修改）。';
     html += '</div>';
 
     if (sorted.length === 0) {
@@ -180,6 +181,14 @@ var FeesPage = (function () {
     return 0;
   }
 
+  /* ===== Auto-calc room fee: (remainingNights × threshold / 100000) × rate ===== */
+  function _calcRoomFee(remainingNights, threshold) {
+    if (remainingNights <= 0 || threshold <= 0) return 0;
+    var rate = State.getRoomFeeRate();
+    var units = (remainingNights * threshold) / ROOM_FEE_UNIT;
+    return Math.round(units * rate);
+  }
+
   function _remainingHTML(remaining) {
     if (remaining <= 0) {
       return '<span style="color:var(--color-success);font-weight:700;">達標</span>';
@@ -306,9 +315,19 @@ var FeesPage = (function () {
         if (newFeeStatus === FEE_TYPES.FREE) {
           updateData.chargeGuest = 0;
           updateData.chargeCompany = 0;
+        } else {
+          /* Auto-calc room fee for paid room */
+          updateData.chargeGuest = _calcRoomFee(remaining, th);
         }
         var updated = Bookings.update(b._fbKey, updateData);
         if (updated) b = updated;
+      } else if (newFeeStatus === FEE_TYPES.PAID) {
+        /* Already paid, but volume changed → recalc chargeGuest */
+        var newFee = _calcRoomFee(remaining, th);
+        if (newFee !== (Number(b.chargeGuest) || 0)) {
+          var updated2 = Bookings.update(b._fbKey, { chargeGuest: newFee });
+          if (updated2) b = updated2;
+        }
       }
     }
 
