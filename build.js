@@ -647,6 +647,7 @@ function runTests() {
     assert(src.indexOf('summary:') !== -1, 'Missing summary()');
     assert(src.indexOf('feeStats:') !== -1, 'Missing feeStats()');
     assert(src.indexOf('profitByAgent:') !== -1, 'Missing profitByAgent()');
+    assert(src.indexOf('calcMonthlyNights:') !== -1, 'Missing calcMonthlyNights()');
   });
 
   /* ===== Test: filters.js defines filter functions ===== */

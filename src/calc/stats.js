@@ -64,6 +64,57 @@ var Stats = {
     return sum;
   },
 
+  /**
+   * Count nights and threshold-nights that fall within a specific month.
+   * For cross-month bookings (e.g., 7/30-8/2), only counts the nights
+   * that fall within the given month.
+   *   Example: 7/30-8/2, threshold=80 -> July: 2 nights, 160; August: 1 night, 80
+   *   Example: 7/31-8/1, threshold=80 -> July: 1 night, 80; August: 0 nights, 0
+   * @param {Array} bookings
+   * @param {string} month - YYYY-MM
+   * @returns {Object} { nights: N, thresholdNights: N }
+   */
+  calcMonthlyNights: function (bookings, month) {
+    if (!bookings || !month) return { nights: 0, thresholdNights: 0 };
+    var nights = 0;
+    var thresholdNights = 0;
+
+    for (var i = 0; i < bookings.length; i++) {
+      var b = bookings[i];
+      var checkIn = b.checkIn;
+      var checkOut = b.checkOut;
+      var th = Number(b.threshold) || 0;
+
+      if (!checkIn || !checkOut) {
+        /* Fallback: if dates missing, use booking's month field */
+        if (b.month === month) {
+          var n = Number(b.nights) || 0;
+          nights += n;
+          thresholdNights += th * n;
+        }
+        continue;
+      }
+
+      /* Walk through each day from checkIn to checkOut-1 */
+      var cur = checkIn;
+      while (cur < checkOut) {
+        if (cur.indexOf(month) === 0) {
+          nights++;
+          thresholdNights += th;
+        }
+        /* Advance one day */
+        var dt = new Date(cur);
+        dt.setDate(dt.getDate() + 1);
+        var y = dt.getFullYear();
+        var m = String(dt.getMonth() + 1).padStart(2, '0');
+        var dd = String(dt.getDate()).padStart(2, '0');
+        cur = y + '-' + m + '-' + dd;
+      }
+    }
+
+    return { nights: nights, thresholdNights: thresholdNights };
+  },
+
   /* ===== Financial Stats (v8 new) ===== */
 
   /**
