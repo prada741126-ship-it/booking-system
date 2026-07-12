@@ -99,7 +99,7 @@ var OverviewPage = (function () {
     } else {
       html += '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint' + (recent.length > 0 ? ' scrollable' : '') + '">';
       html += '<table class="data-table"><thead><tr>';
-      html += '<th>客人</th><th>體系</th><th>入住</th><th>退房</th><th>晚</th><th>代理</th><th>費用</th><th>狀態</th><th>創建日期</th><th>登錄人</th>';
+      html += '<th>客人</th><th>體系</th><th>入住</th><th>退房</th><th style="text-align:center;">入住天數</th><th>代理</th><th>費用</th><th>狀態</th><th>創建日期</th><th>登錄人</th>';
       html += '</tr></thead><tbody>';
       for (var i = 0; i < recent.length; i++) {
         html += _recentRow(recent[i]);
@@ -226,7 +226,7 @@ var OverviewPage = (function () {
     html += '<td>' + Utils.escapeHtml(b.casino || '-') + '</td>';
     html += '<td style="font-size:var(--fs-sm);">' + Utils.formatDateDisplay(b.checkIn) + '</td>';
     html += '<td style="font-size:var(--fs-sm);">' + Utils.formatDateDisplay(b.checkOut) + '</td>';
-    html += '<td class="num-cell">' + (b.nights || 0) + '</td>';
+    html += '<td class="num-cell" style="text-align:center;">' + (b.nights || 0) + '</td>';
     html += '<td>' + Utils.escapeHtml(b.agent || '-') + '</td>';
     html += '<td><span class="fee-badge ' + (b.feeStatus || 'free') + '">' + (FEE_TYPE_LABELS[b.feeStatus] || '免費') + '</span></td>';
     html += '<td>' + _statusBadge(b.status) + '</td>';
