@@ -1,6 +1,6 @@
 /**
  * archives.js — Archive System (v8 new)
- * Auto-archive on checkout/cancel, multi-dimensional query, permanent retention
+ * Only checked-out (settled) bookings are archived. Cancelled bookings are deleted directly.
  * Archives are synced via syncArchiveToFirebase() with _fbKey
  * Archives cannot be deleted (permanent record for auditing)
  */
@@ -13,6 +13,12 @@ var Archives = {
    */
   add: function (booking) {
     if (!booking) return null;
+
+    /* Defensive: cancelled bookings should never be archived (v2.2.1+) */
+    if (booking.status === BOOKING_STATUS.CANCELLED) {
+      console.warn('[Archives] Refused to archive cancelled booking:', booking._fbKey);
+      return null;
+    }
 
     var now = Date.now();
     var archive = {

@@ -222,6 +222,12 @@ var Bookings = {
     if (!booking) return null;
     if (booking.archived) return booking; /* already archived */
 
+    /* Cancelled bookings should be deleted, not archived */
+    if (booking.status === BOOKING_STATUS.CANCELLED) {
+      console.log('[Bookings] Cancelled booking → delete instead of archive:', fbKey);
+      return Bookings.delete(fbKey);
+    }
+
     /* Create archive record */
     if (typeof Archives !== 'undefined') {
       Archives.add(booking);
@@ -293,25 +299,25 @@ var Bookings = {
           newStatus: newStatus
         });
 
-        /* Auto-archive if cancelled (checked-out deferred to manual settlement) */
+        /* Auto-archive if status in toArchive list (currently empty; cancelled → delete in 2nd loop) */
         if (STATUS_AUTO_TRANSITION.toArchive.indexOf(newStatus) !== -1) {
           Bookings.archive(b._fbKey);
         }
       }
     }
 
-    /* Also auto-archive cancelled bookings that haven't been archived */
+    /* Also auto-delete cancelled bookings (no archive, guest never showed up) */
     list = State.get('bookings');
     for (var j = 0; j < list.length; j++) {
       var b2 = list[j];
       if (!b2 || b2._deleted || b2.archived) continue;
       if (b2.status === BOOKING_STATUS.CANCELLED) {
-        Bookings.archive(b2._fbKey);
+        Bookings.delete(b2._fbKey);
         transitions.push({
           fbKey: b2._fbKey,
           guestName: b2.guestName,
           oldStatus: 'cancelled',
-          newStatus: 'archived'
+          newStatus: 'deleted'
         });
       }
     }

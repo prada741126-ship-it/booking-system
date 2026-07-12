@@ -1,7 +1,7 @@
 /**
  * archives.js — History & Audit Page (Ctrl+5)
- * Booking System v2.0.0 (v8 spec)
- * Auto-archive on checkout/cancel. Permanent retention, multi-dimensional query.
+ * Booking System v2.2.1
+ * Cancelled bookings are deleted directly (not archived). Only checked-out (settled) bookings are archived.
  * Renders: KPI + filters + archive records table + summary
  */
 var ArchivesPage = (function () {
@@ -16,7 +16,9 @@ var ArchivesPage = (function () {
     var container = document.getElementById('page-archives');
     if (!container) return;
 
-    var allArchives = Archives.getAll();
+    var allArchives = Archives.getAll().filter(function (a) {
+      return a.finalStatus !== BOOKING_STATUS.CANCELLED;
+    });
     var stats = Archives.getStats(allArchives);
 
     var html = '';
@@ -38,8 +40,6 @@ var ArchivesPage = (function () {
       '<svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>');
     html += _kpiCard('kpi-green', '已退房', stats.checkedOut, '筆', '正常退房歸檔',
       '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>');
-    html += _kpiCard('kpi-red', '已取消', stats.cancelled, '筆', '取消訂房歸檔',
-      '<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>');
     html += _kpiCard('kpi-amber', '總利潤', Utils.formatCurrency(stats.totalProfit, CURRENCY_DEFAULT), '', '所有歸檔利潤',
       '<svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>');
     html += '</div>';
@@ -64,7 +64,6 @@ var ArchivesPage = (function () {
 
     html += '  <div class="filter-item"><label>狀態</label><select id="ar-filter-status" onchange="ArchivesPage.onFilterChange()"><option value="">全部</option>';
     html += '<option value="checked-out"' + (_filters.status === 'checked-out' ? ' selected' : '') + '>已退房</option>';
-    html += '<option value="cancelled"' + (_filters.status === 'cancelled' ? ' selected' : '') + '>已取消</option>';
     html += '  </select></div>';
 
     html += '  <div class="filter-spacer"></div>';
@@ -78,7 +77,9 @@ var ArchivesPage = (function () {
     html += '</div>';
 
     /* Apply filters and render table */
-    var filtered = Archives.search(_filters);
+    var filtered = Archives.search(_filters).filter(function (a) {
+      return a.finalStatus !== BOOKING_STATUS.CANCELLED;
+    });
     var sorted = Filters.sortBookings(filtered, _sortField, _sortAsc);
     var total = sorted.length;
     var totalPages = Math.max(1, Math.ceil(total / _perPage));
@@ -90,10 +91,9 @@ var ArchivesPage = (function () {
       var filteredStats = Archives.getStats(sorted);
       html += '<div class="card" style="margin-bottom:var(--sp-4);">';
       html += '  <div class="card-title"><div class="card-icon"><svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg></div>篩選結果匯總</div>';
-      html += '  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-3);">';
+      html += '  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-3);">';
       html += '    <div class="stat-row"><span class="stat-label">筆數</span><span class="stat-value">' + filteredStats.total + '</span></div>';
       html += '    <div class="stat-row"><span class="stat-label">退房</span><span class="stat-value">' + filteredStats.checkedOut + '</span></div>';
-      html += '    <div class="stat-row"><span class="stat-label">取消</span><span class="stat-value">' + filteredStats.cancelled + '</span></div>';
       html += '    <div class="stat-row"><span class="stat-label">利潤</span><span class="stat-value" style="color:var(--color-warning);font-weight:700;">' + Utils.formatCurrency(filteredStats.totalProfit, CURRENCY_DEFAULT) + '</span></div>';
       html += '  </div>';
       html += '</div>';
@@ -239,7 +239,7 @@ var ArchivesPage = (function () {
     return '<div class="empty-state">' +
       '<div class="empty-icon"><svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg></div>' +
       '<div class="empty-title">暫無歸檔記錄</div>' +
-      '<div class="empty-desc">退房或取消的訂房將自動歸檔至此</div>' +
+      '<div class="empty-desc">退房後確認歸檔的訂房將顯示於此</div>' +
       '</div>';
   }
 

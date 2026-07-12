@@ -346,16 +346,16 @@ function runTests() {
     assert(tpl.indexOf('#f0f2f5') !== -1, 'Should use light theme-color #f0f2f5');
   });
 
-  test('Template version label is v2.2.0', function () {
+  test('Template version label is v2.2.1', function () {
     var tpl = readFile(TEMPLATE);
-    assert(tpl.indexOf('v2.2.0') !== -1, 'Version label should be v2.2.0');
+    assert(tpl.indexOf('v2.2.1') !== -1, 'Version label should be v2.2.1');
   });
 
   /* ===== Test: constants.js defines required constants ===== */
   test('constants.js defines APP', function () {
     var src = getSrc('src/core/constants.js');
     assert(src.indexOf('var APP') !== -1, 'Missing APP');
-    assert(src.indexOf("VERSION: '2.2.0'") !== -1, 'APP.VERSION should be 2.2.0');
+    assert(src.indexOf("VERSION: '2.2.1'") !== -1, 'APP.VERSION should be 2.2.1');
   });
 
   test('constants.js defines CONFIG with v8 settings', function () {
@@ -688,20 +688,48 @@ function runTests() {
     assert(src.indexOf('archived') !== -1, 'Missing archived field');
   });
 
-  /* ===== Test: checked-out deferred archiving (v2.2.0) ===== */
-  test('constants.js: checked-out NOT in toArchive (deferred archiving)', function () {
+  /* ===== Test: cancelled bookings deleted, not archived (v2.2.1) ===== */
+  test('constants.js: toArchive is empty (cancelled → delete, not archive)', function () {
     var src = getSrc('src/core/constants.js');
-    assert(src.indexOf("toArchive: ['cancelled']") !== -1, 'toArchive should only contain cancelled');
-    assert(src.indexOf("toArchive: ['checked-out', 'cancelled']") === -1, 'toArchive should NOT contain checked-out');
+    assert(src.indexOf('toArchive: []') !== -1, 'toArchive should be empty array');
+    assert(src.indexOf("toArchive: ['cancelled']") === -1, 'toArchive should NOT contain cancelled');
     assert(src.indexOf('CHECKOUT_OVERDUE_DAYS') !== -1, 'Missing CHECKOUT_OVERDUE_DAYS config');
   });
 
-  test('bot.js: checked-out NOT in toArchive (deferred archiving)', function () {
+  test('bot.js: toArchive is empty (cancelled → delete, not archive)', function () {
     var src = getSrc('bot/bot.js');
-    assert(src.indexOf("toArchive:    ['cancelled']") !== -1, 'Bot toArchive should only contain cancelled');
-    assert(src.indexOf("toArchive:    ['checked-out', 'cancelled']") === -1, 'Bot toArchive should NOT contain checked-out');
+    assert(src.indexOf('toArchive:    []') !== -1, 'Bot toArchive should be empty array');
+    assert(src.indexOf("toArchive:    ['cancelled']") === -1, 'Bot toArchive should NOT contain cancelled');
     assert(src.indexOf('sendTodayCheckOutReminders') !== -1, 'Missing sendTodayCheckOutReminders function');
     assert(src.indexOf('EMPLOYEE_ROLES.ADMIN') !== -1, 'Checkout reminder should filter by admin role');
+  });
+
+  test('bookings.js: cancelled → delete instead of archive (v2.2.1)', function () {
+    var src = getSrc('src/data/bookings.js');
+    assert(src.indexOf('Cancelled booking → delete instead of archive') !== -1, 'Missing cancel→delete guard in archive()');
+    assert(src.indexOf('Bookings.delete(fbKey)') !== -1, 'archive() should call delete() for cancelled');
+    assert(src.indexOf('auto-delete cancelled') !== -1, 'Missing auto-delete cancelled in autoTransitionStatus');
+    assert(src.indexOf("newStatus: 'deleted'") !== -1, 'Transition should say deleted not archived');
+  });
+
+  test('bot.js: executeCancel deletes booking (v2.2.1)', function () {
+    var src = getSrc('bot/bot.js');
+    assert(src.indexOf('直接删除') !== -1, 'confirmCancel should mention direct delete');
+    assert(src.indexOf('_deleted: true') !== -1, 'executeCancel should use tombstone pattern');
+    assert(src.indexOf('订房已取消并删除') !== -1, 'Success message should say deleted not archived');
+    assert(src.indexOf('订房已取消并归档') === -1, 'Should NOT mention archived in cancel success');
+  });
+
+  test('archives.js: cancelled bookings filtered from page (v2.2.1)', function () {
+    var src = getSrc('src/pages/archives.js');
+    assert(src.indexOf("finalStatus !== BOOKING_STATUS.CANCELLED") !== -1, 'Page should filter out cancelled archives');
+    assert(src.indexOf("已取消") === -1, 'Page should NOT display cancelled KPI/filter/stat');
+    assert(src.indexOf('退房後確認歸檔的訂房將顯示於此') !== -1, 'Empty state should mention checked-out only');
+  });
+
+  test('archives data: refused to archive cancelled (v2.2.1)', function () {
+    var src = getSrc('src/data/archives.js');
+    assert(src.indexOf('Refused to archive cancelled booking') !== -1, 'Archives.add should refuse cancelled bookings');
   });
 
   test('profit.js: batch archive features (v2.2.0)', function () {

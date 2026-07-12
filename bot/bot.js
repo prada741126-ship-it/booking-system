@@ -114,7 +114,7 @@ var STATUS_RULES = {
 var STATUS_AUTO_TRANSITION = {
   toCheckedIn:  ['pending', 'confirmed'],
   toCheckedOut: ['checked-in'],
-  toArchive:    ['cancelled']
+  toArchive:    []  /* cancelled → direct delete (no archive) */
 };
 
 var FEE_TYPES = { FREE: 'free', PAID: 'paid' };
@@ -2401,7 +2401,7 @@ function confirmCancel(chatId, userId, fbKey) {
   }
 
   sendMessage(chatId,
-    '<b>⚠️ 确认取消订房？</b>\n\n取消后订房将自动归档，不可恢复。\n\n确定要取消吗？',
+    '<b>⚠️ 确认取消订房？</b>\n\n取消后订房将直接删除，不可恢复。\n\n确定要取消吗？',
     kb([
       [
         { text: '✅ 确认取消', callback_data: 'cnl_yes:' + fbKey },
@@ -2429,49 +2429,18 @@ function executeCancel(chatId, userId, fbKey) {
       return;
     }
 
-    booking.status = BOOKING_STATUS.CANCELLED;
-    booking.archived = true;
-    booking.archivedAt = Date.now();
-    booking._updatedAt = Date.now();
-
-    fbPut(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), booking, function (err2) {
+    /* Direct delete via tombstone pattern (no archive, guest never showed up) */
+    var tombstone = {
+      _fbKey: fbKey,
+      _deleted: true,
+      _updatedAt: Date.now()
+    };
+    fbPut(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), tombstone, function (err2) {
       if (err2) {
         sendMessage(chatId, '❌ 取消失败：' + err2, mainMenuKB(getEmployeeByTgId(userId)));
         clearSession(userId);
         return;
       }
-
-      /* Create archive record */
-      var archiveKey = generateFbKey();
-      var archive = {
-        _fbKey: archiveKey,
-        _createdAt: Date.now(),
-        originalKey: fbKey,
-        archivedAt: Date.now(),
-        finalStatus: BOOKING_STATUS.CANCELLED,
-        guestName: booking.guestName,
-        agent: booking.agent,
-        employee: booking.employee,
-        employeeId: booking.employeeId,
-        casino: booking.casino,
-        hotel: booking.hotel,
-        roomType: booking.roomType,
-        checkIn: booking.checkIn,
-        checkOut: booking.checkOut,
-        nights: booking.nights,
-        smoking: booking.smoking,
-        feeStatus: booking.feeStatus,
-        chargeGuest: booking.chargeGuest,
-        chargeCompany: booking.chargeCompany,
-        profit: booking.profit,
-        currency: booking.currency,
-        confirmNo: booking.confirmNo,
-        pickupName: booking.pickupName,
-        transfer: booking.transfer,
-        threshold: booking.threshold,
-        remark: booking.remark
-      };
-      fbPut(CONFIG.FIREBASE.PATHS.ARCHIVES + '/' + encodeURIComponent(archiveKey), archive);
 
       /* Write bot log */
       writeBotLog({
@@ -2480,16 +2449,16 @@ function executeCancel(chatId, userId, fbKey) {
         employee:   booking.employee,
         employeeId: booking.employeeId,
         action:     'booking_cancel',
-        message:    '取消订房：' + booking.guestName,
+        message:    '取消订房（直接删除）：' + booking.guestName,
         bookingKey: fbKey,
         userId:     userId
       });
 
-      var text = '✅ <b>订房已取消并归档</b>\n\n';
+      var text = '✅ <b>订房已取消并删除</b>\n\n';
       text += '👤 客人：' + escapeHtml(booking.guestName) + '\n';
       text += '🏨 ' + booking.casino + ' / ' + booking.hotel + '\n';
       text += '📅 ' + booking.checkIn + ' ~ ' + booking.checkOut + '\n';
-      text += '📊 状态：已取消（已归档）';
+      text += '📊 状态：已删除';
 
       clearSession(userId);
       sendMessage(chatId, text, mainMenuKB(getEmployeeByTgId(userId)));
@@ -3260,42 +3229,10 @@ function dailyScan() {
         b.status = newStatus;
         b._updatedAt = Date.now();
 
-        /* Auto-archive if cancelled (checked-out deferred to manual settlement) */
+        /* Auto-archive if status in toArchive list (currently empty; cancelled → delete in 2nd loop) */
         if (STATUS_AUTO_TRANSITION.toArchive.indexOf(newStatus) !== -1) {
           b.archived = true;
           b.archivedAt = Date.now();
-
-          /* Create archive record */
-          var archiveKey = generateFbKey();
-          var archive = {
-            _fbKey: archiveKey,
-            _createdAt: Date.now(),
-            originalKey: b._fbKey,
-            archivedAt: Date.now(),
-            finalStatus: newStatus,
-            guestName: b.guestName,
-            agent: b.agent,
-            employee: b.employee,
-            employeeId: b.employeeId,
-            casino: b.casino,
-            hotel: b.hotel,
-            roomType: b.roomType,
-            checkIn: b.checkIn,
-            checkOut: b.checkOut,
-            nights: b.nights,
-            smoking: b.smoking,
-            feeStatus: b.feeStatus,
-            chargeGuest: b.chargeGuest,
-            chargeCompany: b.chargeCompany,
-            profit: b.profit,
-            currency: b.currency,
-            confirmNo: b.confirmNo,
-            pickupName: b.pickupName,
-            transfer: b.transfer,
-            threshold: b.threshold,
-            remark: b.remark
-          };
-          fbPut(CONFIG.FIREBASE.PATHS.ARCHIVES + '/' + encodeURIComponent(archiveKey), archive);
         }
 
         /* Write updated booking back */
@@ -3312,54 +3249,26 @@ function dailyScan() {
       }
     }
 
-    /* Also auto-archive cancelled bookings */
+    /* Also auto-delete cancelled bookings (no archive, guest never showed up) */
     for (var key2 in data) {
       if (!data.hasOwnProperty(key2)) continue;
       var b2 = data[key2];
       if (!b2 || b2._deleted || b2.archived) continue;
       if (b2.status === BOOKING_STATUS.CANCELLED) {
-        b2.archived = true;
-        b2.archivedAt = Date.now();
-        b2._updatedAt = Date.now();
-        fbPut(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(b2._fbKey), b2);
-
-        var archKey2 = generateFbKey();
-        var arch2 = {
-          _fbKey: archKey2,
-          _createdAt: Date.now(),
-          originalKey: b2._fbKey,
-          archivedAt: Date.now(),
-          finalStatus: BOOKING_STATUS.CANCELLED,
-          guestName: b2.guestName,
-          agent: b2.agent,
-          employee: b2.employee,
-          employeeId: b2.employeeId,
-          casino: b2.casino,
-          hotel: b2.hotel,
-          roomType: b2.roomType,
-          checkIn: b2.checkIn,
-          checkOut: b2.checkOut,
-          nights: b2.nights,
-          smoking: b2.smoking,
-          feeStatus: b2.feeStatus,
-          chargeGuest: b2.chargeGuest,
-          chargeCompany: b2.chargeCompany,
-          profit: b2.profit,
-          currency: b2.currency,
-          confirmNo: b2.confirmNo,
-          pickupName: b2.pickupName,
-          transfer: b2.transfer,
-          threshold: b2.threshold,
-          remark: b2.remark
+        /* Delete via tombstone pattern */
+        var tombstone2 = {
+          _fbKey: b2._fbKey,
+          _deleted: true,
+          _updatedAt: Date.now()
         };
-        fbPut(CONFIG.FIREBASE.PATHS.ARCHIVES + '/' + encodeURIComponent(archKey2), arch2);
+        fbPut(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(b2._fbKey), tombstone2);
 
         transitions.push({
           fbKey: b2._fbKey,
           guestName: b2.guestName,
           oldStatus: 'cancelled',
-          newStatus: 'archived',
-          archived: true
+          newStatus: 'deleted',
+          archived: false
         });
         updates++;
       }

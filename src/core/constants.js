@@ -6,7 +6,7 @@
 
 /* ===== App Info ===== */
 var APP = {
-  VERSION: '2.2.0',
+  VERSION: '2.2.1',
   TITLE: 'VIP Booking System',
   SYSTEM_NAME: 'BookingHub'
 };
@@ -270,8 +270,8 @@ var STATUS_AUTO_TRANSITION = {
   toCheckedIn: ['pending', 'confirmed'],
   /* If checkOut date <= today and status is checked-in -> checked-out */
   toCheckedOut: ['checked-in'],
-  /* cancelled -> auto archive immediately; checked-out stays active for manual settlement */
-  toArchive: ['cancelled']
+  /* cancelled -> direct delete (no archive); checked-out deferred to manual settlement */
+  toArchive: []
 };
 
 /* ===== Room Fee Rate (auto-calc) ===== */
