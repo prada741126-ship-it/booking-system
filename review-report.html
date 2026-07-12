@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BookingHub v2.1.8 — 全面審查報告</title>
+<style>
+  :root {
+    --color-primary: #2563eb;
+    --color-success: #16a34a;
+    --color-warning: #f59e0b;
+    --color-danger: #ef4444;
+    --color-info: #0ea5e9;
+    --bg-base: #f0f2f5;
+    --bg-elevated: #ffffff;
+    --text-primary: #1e293b;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --border-default: #e2e8f0;
+    --radius-lg: 12px;
+    --radius-md: 8px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Segoe UI', 'Microsoft JhengHei', 'Noto Sans TC', sans-serif;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    line-height: 1.7;
+    padding: 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.6rem; margin-bottom: 4px; }
+  h2 { font-size: 1.25rem; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--color-primary); }
+  h3 { font-size: 1.05rem; margin: 20px 0 8px; }
+  .subtitle { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 24px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .summary-card { background: var(--bg-elevated); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm); text-align: center; }
+  .summary-card .num { font-size: 2rem; font-weight: 800; }
+  .summary-card .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+  .summary-card.p0 .num { color: var(--color-danger); }
+  .summary-card.p1 .num { color: var(--color-warning); }
+  .summary-card.p2 .num { color: var(--color-success); }
+  .summary-card.feature .num { color: var(--color-info); }
+  .section { background: var(--bg-elevated); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 20px; box-shadow: var(--shadow-sm); }
+  .section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .section-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+  .section-icon.func { background: rgba(14,165,233,0.1); }
+  .section-icon.struct { background: rgba(37,99,235,0.1); }
+  .section-icon.sync { background: rgba(22,163,74,0.1); }
+  .section-icon.design { background: rgba(245,158,11,0.1); }
+  .section-title { font-size: 1.15rem; font-weight: 700; }
+  .item { padding: 14px 16px; border-radius: var(--radius-md); margin-bottom: 10px; border-left: 4px solid; }
+  .item:last-child { margin-bottom: 0; }
+  .item.high { border-color: var(--color-danger); background: rgba(239,68,68,0.04); }
+  .item.mid { border-color: var(--color-warning); background: rgba(245,158,11,0.04); }
+  .item.low { border-color: var(--color-success); background: rgba(22,163,74,0.04); }
+  .item.info { border-color: var(--color-info); background: rgba(14,165,233,0.04); }
+  .item-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .item-title { font-weight: 700; font-size: 0.95rem; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 0.7rem; font-weight: 600; }
+  .badge-high { background: rgba(239,68,68,0.12); color: var(--color-danger); }
+  .badge-mid { background: rgba(245,158,11,0.12); color: var(--color-warning); }
+  .badge-low { background: rgba(22,163,74,0.12); color: var(--color-success); }
+  .badge-info { background: rgba(14,165,233,0.12); color: var(--color-info); }
+  .badge-done { background: rgba(22,163,74,0.12); color: var(--color-success); }
+  .item-desc { font-size: 0.85rem; color: var(--text-secondary); }
+  .item-code { font-family: 'Consolas', monospace; font-size: 0.8rem; background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px; }
+  .strength { padding: 10px 14px; border-radius: var(--radius-md); margin-bottom: 8px; background: rgba(22,163,74,0.06); border-left: 4px solid var(--color-success); }
+  .strength:last-child { margin-bottom: 0; }
+  .strength-title { font-weight: 700; font-size: 0.9rem; color: var(--color-success); }
+  .strength-desc { font-size: 0.83rem; color: var(--text-secondary); }
+  .action-list { margin-top: 8px; padding-left: 20px; }
+  .action-list li { font-size: 0.83rem; color: var(--text-secondary); margin-bottom: 4px; }
+  .recommend-bar { display: flex; gap: 12px; margin-top: 24px; padding: 16px; background: linear-gradient(135deg, rgba(37,99,235,0.06), rgba(14,165,233,0.06)); border-radius: var(--radius-lg); }
+  .recommend-bar strong { color: var(--color-primary); }
+  @media (max-width: 768px) {
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    body { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>BookingHub v2.1.8 — 全面審查報告</h1>
+<p class="subtitle">審查日期：2026-07-12 ｜ 範圍：功能實用性、結構完整性、同步功能、美工設計 ｜ 審查文件：32 JS + 4 CSS + Bot</p>
+
+<div class="summary-grid">
+  <div class="summary-card feature">
+    <div class="num">10</div>
+    <div class="label">建議新增功能</div>
+  </div>
+  <div class="summary-card p1">
+    <div class="num">7</div>
+    <div class="label">結構待改善項</div>
+  </div>
+  <div class="summary-card p0">
+    <div class="num">5</div>
+    <div class="label">同步問題</div>
+  </div>
+  <div class="summary-card p2">
+    <div class="num">8</div>
+    <div class="label">美工可優化</div>
+  </div>
+</div>
+
+<!-- ==================== 1. 功能實用性 ==================== -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon func">🎯</div>
+    <div class="section-title">一、功能實用性 — 建議新增功能</div>
+  </div>
+
+  <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;">
+    以下功能類似「今日入住提醒」，都是對日常營運有直接幫助的實用性增強。按優先級排列。
+  </p>
+
+  <div class="item high">
+    <div class="item-head">
+      <span class="badge badge-high">P0</span>
+      <span class="item-title">1. 總覽頁「今日入住 / 今日退房」提醒卡片</span>
+    </div>
+    <div class="item-desc">
+      目前「今日入住提醒」只存在於 Telegram Bot（每日 09:00 推送），<strong>Web 總覽頁完全沒有</strong>。
+      建議在總覽頁 KPI 卡片下方加入「今日入住 N 筆」+「今日退房 N 筆」橫條卡片，點擊展開名單。
+      這樣不打開 Bot 也能一眼看到當日待辦。<br>
+      <span class="item-code">bookings.js</span> 已有 <span class="item-code">Utils.isToday()</span> 工具函數可直接使用。
+    </div>
+  </div>
+
+  <div class="item high">
+    <div class="item-head">
+      <span class="badge badge-high">P0</span>
+      <span class="item-title">2. 費用未填 / 利潤未填 提醒</span>
+    </div>
+    <div class="item-desc">
+      已退房（checked-out）的訂房，如果 <span class="item-code">chargeGuest</span> 或 <span class="item-code">chargeCompany</span> 未填，
+      月結時容易遺漏。建議在總覽頁顯示「N 筆待收費」「N 筆待填利潤」警示徽章，點擊跳轉到費用/利潤頁。
+    </div>
+  </div>
+
+  <div class="item high">
+    <div class="item-head">
+      <span class="badge badge-high">P0</span>
+      <span class="item-title">3. 待確認訂房超時提醒</span>
+    </div>
+    <div class="item-desc">
+      pending 狀態超過 3 天未確認的訂房，可能遺漏或忘記。建議總覽頁顯示「N 筆待確認超時」紅色警示。
+      <span class="item-code">Bookings.getBookingsNeedingReminder()</span> 已有類似邏輯可參考。
+    </div>
+  </div>
+
+  <div class="item mid">
+    <div class="item-head">
+      <span class="badge badge-mid">P1</span>
+      <span class="item-title">4. 點擊代理名快速篩選</span>
+    </div>
+    <div class="item-desc">
+      在任何表格中點擊代理名，自動跳轉到「代理業績」頁並篩選該代理。減少手動切換頁面+選下拉的操作。
+    </div>
+  </div>
+
+  <div class="item mid">
+    <div class="item-head">
+      <span class="badge badge-mid">P1</span>
+      <span class="item-title">5. 確認號快速複製</span>
+    </div>
+    <div class="item-desc">
+      點擊確認號欄位即可複製到剪貼簿，並顯示「已複製」Toast。減少在手機上長按選取的不便。
+    </div>
+  </div>
+
+  <div class="item mid">
+    <div class="item-head">
+      <span class="badge badge-mid">P1</span>
+      <span class="item-title">6. 訂房重複檢測</span>
+    </div>
+    <div class="item-desc">
+      新增訂房時，如果同一客人姓名 + 入住日期重疊，跳出警告「疑似重複訂房：XXX 已有 7/10-7/12 的訂房」。防範重複登記。
+    </div>
+  </div>
+
+  <div class="item mid">
+    <div class="item-head">
+      <span class="badge badge-mid">P1</span>
+      <span class="item-title">7. 匯出月度 CSV 報表</span>
+    </div>
+    <div class="item-desc">
+      一鍵匯出當月所有訂房明細為 CSV，方便傳給會計或老闆看。包含：客人/代理/酒店/日期/費用/利潤等欄位。
+    </div>
+  </div>
+
+  <div class="item low">
+    <div class="item-head">
+      <span class="badge badge-low">P2</span>
+      <span class="item-title">8. 批次狀態更新</span>
+    </div>
+    <div class="item-desc">
+      表格加 checkbox，勾選多筆後批次確認/取消。月底大批量操作時很實用。
+    </div>
+  </div>
+
+  <div class="item low">
+    <div class="item-head">
+      <span class="badge badge-low">P2</span>
+      <span class="item-title">9. 代理月度對帳單</span>
+    </div>
+    <div class="item-desc">
+      在代理業績頁加「匯出對帳單」按鈕，生成某代理某月的完整明細+合計，可列印或匯出。
+    </div>
+  </div>
+
+  <div class="item low">
+    <div class="item-head">
+      <span class="badge badge-low">P2</span>
+      <span class="item-title">10. 最近操作日誌</span>
+    </div>
+    <div class="item-desc">
+      記錄最近 50 筆操作（新增/編輯/刪除/狀態變更/封存），含操作人+時間，方便追溯爭議。
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 2. 結構完整性 ==================== -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon struct">🏗️</div>
+    <div class="section-title">二、結構完整性</div>
+  </div>
+
+  <h3 style="color:var(--color-success);">✓ 現有優勢</h3>
+  <div class="strength">
+    <div class="strength-title">清晰的分層架構</div>
+    <div class="strength-desc">core / data / sync / calc / ui / pages / bridge 七層分離，職責明確</div>
+  </div>
+  <div class="strength">
+    <div class="strength-title">IIFE 模組封裝</div>
+    <div class="strength-desc">OverviewPage / FeesPage / ProfitPage 等模組避免全域污染</div>
+  </div>
+  <div class="strength">
+    <div class="strength-title">Event Bus 解耦</div>
+    <div class="strength-desc">38 個事件讓模組間通信不直接依賴</div>
+  </div>
+  <div class="strength">
+    <div class="strength-title">純函數計算層</div>
+    <div class="strength-desc">calc/stats + calc/filters 無副作用，可獨立測試</div>
+  </div>
+
+  <h3 style="margin-top:20px;">待改善項</h3>
+
+  <div class="item high">
+    <div class="item-head">
+      <span class="badge badge-high">P0</span>
+      <span class="item-title">1. State.set() 觸發 UI_RENDER 過於頻繁</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">state.js</span> 第 38 行：每次 <span class="item-code">set()</span> 都 emit <span class="item-code">UI_RENDER</span>，
+      而 <span class="item-code">app.js</span> 監聽 UI_RENDER 會重渲染整個頁面。
+      同步下載時連續 set 6 次（bookings/hc/agentList/...），等於渲染 6 次。
+      <strong>建議：</strong>加入 debounce 或區分「數據變更」和「UI 刷新」事件。
+    </div>
+  </div>
+
+  <div class="item high">
+    <div class="item-head">
+      <span class="badge badge-high">P0</span>
+      <span class="item-title">2. _hasChanged() 比較邏輯不嚴謹</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">watchers.js</span> 第 362-374 行：只比較陣列長度和 <span class="item-code">_updatedAt</span> 總和。
+      如果兩個不同的陣列碰巧長度相同且 _updatedAt 總和相同，會誤判為「無變化」而跳過更新。
+      <strong>建議：</strong>改用 JSON.stringify 比較，或至少比較每個元素的 _updatedAt 值。
+    </div>
+  </div>
+
+  <div class="item mid">
+    <div class="item-head">
+      <span class="badge badge-mid">P1</span>
+      <span class="item-title">3. afterFirebaseReady 競態風險</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">app.js</span> 第 245-257 行：同時調用 <span class="item-code">startWatchers()</span> + <span class="item-code">syncDownloadAll()</span>。
+      watchers 的即時 <span class="item-code">on('value')</span> 和 syncDownloadAll 的 <span class="item-code">once('value')</span> 會同時觸發，
+      兩者都嘗試 merge + State.set，可能互相覆蓋。
+      <strong>建議：</strong>先 syncDownloadAll 完成，再 startWatchers。
+    </div>
+  </div>
+
+  <div class="item mid">
+    <div class="item-head">
+      <span class="badge badge-mid">P1</span>
+      <span class="item-title">4. 錯誤處理不一致</span>
+    </div>
+    <div class="item-desc">
+      三種模式混用：(1) try-catch + console.error；(2) Events.emit(ERROR)；(3) 兩者都有。
+      部分 catch 只記錄不通知用戶，用戶完全不知道操作失敗了。
+      <strong>建議：</strong>統一為 try-catch + console.error + Toast.error 三件套。
+    </div>
+  </div>
+
+  <div class="item mid">
+    <div class="item-head">
+      <span class="badge badge-mid">P1</span>
+      <span class="item-title">5. closedMonths 用陣列而非物件</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">watchers.js</span> 第 163 行：用 <span class="item-code">JSON.stringify</span> 比較陣列，效能差且順序敏感。
+      <strong>建議：</strong>改用物件 <span class="item-code">{ "2026-06": true }</span> 或 Set，比較更可靠。
+    </div>
+  </div>
+
+  <div class="item low">
+    <div class="item-head">
+      <span class="badge badge-low">P2</span>
+      <span class="item-title">6. bridge.js 過於龐大</span>
+    </div>
+    <div class="item-desc">
+      所有全域 onclick 函數集中在一個文件，雖然職責明確但超過 800 行不易維護。
+      <strong>建議：</strong>按功能拆分為 booking-bridge / agent-bridge / sync-bridge / misc-bridge。
+    </div>
+  </div>
+
+  <div class="item low">
+    <div class="item-head">
+      <span class="badge badge-low">P2</span>
+      <span class="item-title">7. 缺乏 calc 層單元測試</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">build.js</span> 有 95 項整合測試，但 calc/stats 和 calc/filters 的純函數沒有獨立單元測試。
+      <strong>建議：</strong>加入邊界條件測試（空陣列/null/undefined/極端值）。
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 3. 同步功能 ==================== -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon sync">🔄</div>
+    <div class="section-title">三、同步功能</div>
+  </div>
+
+  <h3 style="color:var(--color-success);">✓ 現有優勢</h3>
+  <div class="strength">
+    <div class="strength-title">完整的 7+1 watcher 覆蓋</div>
+    <div class="strength-desc">bookings/hotelConfig/agentList/employeeList/archives/closedMonths/settings + clearedAt</div>
+  </div>
+  <div class="strength">
+    <div class="strength-title">墓碑機制 + 30天TTL + recentlyDeleted 防復活</div>
+    <div class="strength-desc">三重刪除保護，確保刪除操作正確同步且不會被舊數據覆活</div>
+  </div>
+  <div class="strength">
+    <div class="strength-title">時間戳衝突解決</div>
+    <div class="strength-desc">_updatedAt 較大者勝出，含墓碑在內</div>
+  </div>
+  <div class="strength">
+    <div class="strength-title">重連自動同步</div>
+    <div class="strength-desc">連線恢復後 3 秒 syncDownloadAll → 5 秒 syncUploadAll</div>
+  </div>
+
+  <h3 style="margin-top:20px;">待修復問題</h3>
+
+  <div class="item high">
+    <div class="item-head">
+      <span class="badge badge-high">P0</span>
+      <span class="item-title">1. syncDownloadAll 不下載 settings</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">watchers.js</span> 第 233 行：<span class="item-code">pending = 6</span>，
+      6路並行下載只包含 bookings/hotelConfig/agentList/employeeList/archives/closedMonths，
+      <strong>缺少 settings</strong>。雖然 <span class="item-code">_watchSettings()</span> 會處理，但如果 watcher 尚未觸發，
+      settings 的初始值只有空物件 <span class="item-code">{}</span>，roomFeeRate 會用預設值。
+      <strong>建議：</strong>加入 settings 下載分支，pending 改為 7。
+    </div>
+  </div>
+
+  <div class="item high">
+    <div class="item-head">
+      <span class="badge badge-high">P0</span>
+      <span class="item-title">2. settings watcher 不 emit 事件</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">watchers.js</span> 第 178-197 行：settings 同步後只 <span class="item-code">State.set('settings', remote)</span>，
+      <strong>沒有 emit 任何事件</strong>。而 <span class="item-code">State.set()</span> 會 emit <span class="item-code">UI_RENDER</span>，
+      但 app.js 的 UI_RENDER handler 會重渲染當前頁面——如果當時不在需要顯示 roomFeeRate 的頁面，就不會更新。
+      <strong>建議：</strong>加 <span class="item-code">Events.emit(EVENTS.SYNC_SETTINGS, remote)</span> 讓費用頁能監聽。
+    </div>
+  </div>
+
+  <div class="item high">
+    <div class="item-head">
+      <span class="badge badge-high">P0</span>
+      <span class="item-title">3. _watchClearedAt 比較邏輯有誤</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">watchers.js</span> 第 205 行：用 <span class="item-code">LAST_SYNC_TIME</span> 而非專用的
+      <span class="item-code">LAST_CLEARED_AT</span> 來比較 clearedAt 時間戳。
+      正常同步也會更新 LAST_SYNC_TIME，可能導致清除信號被「已同步」信號覆蓋而漏觸發。
+      <strong>建議：</strong>使用獨立的 <span class="item-code">Store.load('bk_last_cleared_at')</span> 來追蹤。
+    </div>
+  </div>
+
+  <div class="item mid">
+    <div class="item-head">
+      <span class="badge badge-mid">P1</span>
+      <span class="item-title">4. agentList/employeeList 不在 syncUploadAll</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">uploader.js</span> 第 117-129 行：syncUploadAll 只上傳 bookings/archives/hotelConfig/closedMonths/settings，
+      <strong>不含 agentList 和 employeeList</strong>。如果離線時新增了代理，重連後只靠 watcher 觸發——但 watcher 是下載方向，不會主動上傳。
+      <strong>建議：</strong>在 objectPaths 中加入 agentList 和 employeeList。
+    </div>
+  </div>
+
+  <div class="item mid">
+    <div class="item-head">
+      <span class="badge badge-mid">P1</span>
+      <span class="item-title">5. botLogs 無清理機制</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">syncBotLogToFirebase</span> 只增不刪，botLogs 在 Firebase 中會無限增長，最終拖慢 watcher 下載速度。
+      <strong>建議：</strong>Bot 端每日清理 30 天以上的日誌，或 Web 端定期清理。
+    </div>
+  </div>
+
+  <div class="item low">
+    <div class="item-head">
+      <span class="badge badge-low">P2</span>
+      <span class="item-title">6. 離線編輯隊列非持久化</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">uploader.js</span> 的 <span class="item-code">_queue</span> 在記憶體中，頁面刷新即丟失。
+      如果 Firebase 斷線時做了操作，刷新頁面後這些操作就不會上傳。
+      <strong>建議：</strong>將隊列持久化到 localStorage，刷新後恢復。
+    </div>
+  </div>
+
+  <div class="item low">
+    <div class="item-head">
+      <span class="badge badge-low">P2</span>
+      <span class="item-title">7. transaction 失敗無重試</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">_uploadArrayPath</span> 的 transaction 失敗只記錄 error，不重試。
+      <strong>建議：</strong>加入 1-2 次重試 + 指數退避。
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 4. 美工設計 ==================== -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon design">🎨</div>
+    <div class="section-title">四、美工設計</div>
+  </div>
+
+  <h3 style="color:var(--color-success);">✓ 現有優勢</h3>
+  <div class="strength">
+    <div class="strength-title">完整的設計令牌系統</div>
+    <div class="strength-desc">variables.css 定義色彩/字體/間距/圓角/陰影/過渡/z-index 等全套令牌</div>
+  </div>
+  <div class="strength">
+    <div class="strength-title">響應式佈局完善</div>
+    <div class="strength-desc">768px 平板 + 480px 手機雙斷點，底部導航+抽屜側欄</div>
+  </div>
+  <div class="strength">
+    <div class="strength-title">豐富的組件庫</div>
+    <div class="strength-desc">KPI 卡片/徽章/骨架屏/進度度條/圓環圖/矩陣表/空狀態等</div>
+  </div>
+  <div class="strength">
+    <div class="strength-title">列印樣式支援</div>
+    <div class="strength-desc">隱藏交互元素，保留內容可列印</div>
+  </div>
+
+  <h3 style="margin-top:20px;">可優化項</h3>
+
+  <div class="item mid">
+    <div class="item-head">
+      <span class="badge badge-mid">P1</span>
+      <span class="item-title">1. 總覽頁缺乏「今日提醒」視覺區塊</span>
+    </div>
+    <div class="item-desc">
+      Bot 有今日入住提醒，但 Web 總覽頁沒有對應的視覺卡片。建議在 KPI 卡片和狀態分佈之間，
+      加入「今日入住 / 今日退房 / 待確認 / 待收費」四格提醒橫條，用鮮明色彩突出。
+    </div>
+  </div>
+
+  <div class="item mid">
+    <div class="item-head">
+      <span class="badge badge-mid">P1</span>
+      <span class="item-title">2. 費用分佈圓環圖無動畫</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">overview.js</span> 的 <span class="item-code">_feeDonut()</span> 用 conic-gradient 靜態生成，
+      缺少載入動畫。建議加入 CSS transition 或 @keyframes 讓圓環從 0% 生長到目標百分比。
+    </div>
+  </div>
+
+  <div class="item mid">
+    <div class="item-head">
+      <span class="badge badge-mid">P1</span>
+      <span class="item-title">3. 空狀態設計不一致</span>
+    </div>
+    <div class="item-desc">
+      部分頁面用 <span class="item-code">_emptyStateMini()</span>（純文字），部分用更精緻的空狀態（圖標+文字+按鈕）。
+      建議統一為一個 <span class="item-code">EmptyState</span> 組件，含圖標、標題、描述、可選按鈕。
+    </div>
+  </div>
+
+  <div class="item mid">
+    <div class="item-head">
+      <span class="badge badge-mid">P1</span>
+      <span class="item-title">4. 表格桌面版列數多時擁擠</span>
+    </div>
+    <div class="item-desc">
+      費用收取頁有 13 列，在較小桌面螢幕上可能出現水平滾動。建議考慮：
+      (1) 欄位寬度用 min-width 而非固定 width；(2) 部分次要欄位可收合/展開。
+    </div>
+  </div>
+
+  <div class="item low">
+    <div class="item-head">
+      <span class="badge badge-low">P2</span>
+      <span class="item-title">5. 顏色對比度可能不足</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">--text-muted: #94a3b8</span> 在 <span class="item-code">--bg-elevated: #ffffff</span> 上的對比度約 2.8:1，
+      低於 WCAG AA 標準的 4.5:1。KPI 卡片的 kpi-sub 文字使用此色，在強光下手機可能難以辨識。
+      <strong>建議：</strong>將 muted 提深到 <span class="item-code">#64748b</span>（slate-500，對比度 4.6:1）。
+    </div>
+  </div>
+
+  <div class="item low">
+    <div class="item-head">
+      <span class="badge badge-low">P2</span>
+      <span class="item-title">6. 狀態分佈進度條首次渲染不觸發動畫</span>
+    </div>
+    <div class="item-desc">
+      <span class="item-code">_statusRow()</span> 的進度條有 <span class="item-code">transition: width 0.6s</span>，
+      但首次渲染時 width 直接設為目標值，不會從 0 過渡。
+      <strong>建議：</strong>先設 width:0，然後用 requestAnimationFrame 設為目標值。
+    </div>
+  </div>
+
+  <div class="item low">
+    <div class="item-head">
+      <span class="badge badge-low">P2</span>
+      <span class="item-title">7. 頁面切換無過渡動畫</span>
+    </div>
+    <div class="item-desc">
+      切換頁面時內容直接替換，缺乏淡入效果。建議加 <span class="item-code">animation: fadeIn 0.2s</span>。
+    </div>
+  </div>
+
+  <div class="item low">
+    <div class="item-head">
+      <span class="badge badge-low">P2</span>
+      <span class="item-title">8. 列印樣式可改進</span>
+    </div>
+    <div class="item-desc">
+      列印時仍顯示部分操作按鈕。建議在 <span class="item-code">@media print</span> 中加
+      <span class="item-code">.btn, .page-actions { display: none !important; }</span>。
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 總結建議 ==================== -->
+<div class="recommend-bar">
+  <div>
+    <strong>📋 建議實施順序：</strong><br>
+    <strong>第一批（P0，立即修）：</strong>同步#1 settings 下載 + 同步#2 settings 事件 + 同步#3 clearedAt 比較 + 結構#1 State debounce + 結構#2 _hasChanged 修復<br>
+    <strong>第二批（P0 功能）：</strong>功能#1 總覽頁今日提醒卡片 + 功能#2 費用未填提醒 + 功能#3 待確認超時提醒<br>
+    <strong>第三批（P1）：</strong>功能#4-7 + 結構#3-5 + 同步#4-5 + 美工#1-4<br>
+    <strong>第四批（P2）：</strong>其餘低優先級項目
+  </div>
+</div>
+
+</body>
+</html>

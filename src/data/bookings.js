@@ -293,7 +293,7 @@ var Bookings = {
           newStatus: newStatus
         });
 
-        /* Auto-archive if checked-out */
+        /* Auto-archive if cancelled (checked-out deferred to manual settlement) */
         if (STATUS_AUTO_TRANSITION.toArchive.indexOf(newStatus) !== -1) {
           Bookings.archive(b._fbKey);
         }

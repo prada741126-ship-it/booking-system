@@ -1,10 +1,17 @@
 /**
  * agent-performance.js — Agent Performance Page (Ctrl+4)
- * Booking System v2.0.0 (v8 spec)
- * Renders: KPI + agent × casino matrix + agent ranking + per-agent breakdown
+ * Booking System v2.2.0
+ * Renders: KPI + agent × casino matrix + agent ranking + paginated per-agent breakdown
  * Note: Agents != Employees (agents represent customers, employees operate the Bot)
  */
 var AgentPerfPage = (function () {
+
+  /* Pagination state for detail table */
+  var _page = 1;
+  var _search = '';
+  var _sortField = 'agent';
+  var _sortAsc = true;
+  var _expandAll = false;
 
   function render() {
     var container = document.getElementById('page-agent-performance');
@@ -52,7 +59,7 @@ var AgentPerfPage = (function () {
     /* Agent ranking by count */
     html += '<div class="card">';
     html += '  <div class="card-title"><div class="card-icon"><svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg></div>訂房排行</div>';
-    html += _rankingTable(Stats.topAgents(monthBookings, 10), 'agent', '訂房數');
+    html += _rankingTable(Stats.topAgents(monthBookings, 10), 'agent', '訂房數', 'requiredVolume', '所需轉碼');
     html += '</div>';
 
     /* Agent profit ranking */
@@ -63,13 +70,60 @@ var AgentPerfPage = (function () {
 
     html += '</div>';
 
-    /* Booking detail table with threshold per booking */
+    /* ===== Paginated Booking Detail Table ===== */
     html += '<div class="card" style="margin-top:var(--sp-4);">';
-    html += '  <div class="card-title"><div class="card-icon"><svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zm0-8v2h14V9H7z"/></svg></div>逐筆訂房明細（含洗碼門檻）</div>';
+    html += '  <div class="card-title"><div class="card-icon"><svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zm0-8v2h14V9H7z"/></svg></div>逐筆訂房明細（含洗碼門檻）';
+    html += '    <span style="font-size:var(--fs-xs);color:var(--text-muted);font-weight:400;margin-left:var(--sp-2);">' + monthBookings.length + ' 筆</span>';
+    html += '  </div>';
+
+    /* Formula hint */
+    html += '<div style="margin-bottom:var(--sp-2);color:var(--text-muted);font-size:var(--fs-xs);">';
+    html += '折抵天數 = 客戶轉碼 ÷ 每晚門檻（無條件退位）。轉碼金額請至「費用收取」頁面填寫。';
+    html += '</div>';
+
+    /* Toolbar */
+    html += Paginator.renderToolbar(
+      Paginator.renderSearch(_search, 'AgentPerfPage.onSearch', '搜索客人姓名、代理、酒店...'),
+      Paginator.renderExpandToggle(_expandAll, 'AgentPerfPage.toggleExpand')
+    );
+
     html += _detailTable(monthBookings);
     html += '</div>';
 
     container.innerHTML = html;
+  }
+
+  /* ===== Re-render helpers ===== */
+  function _rerender() {
+    render();
+  }
+
+  function goPage(n) {
+    _page = n;
+    _rerender();
+  }
+
+  function onSearch(term) {
+    _search = term;
+    _page = 1;
+    _rerender();
+  }
+
+  function sortByCol(field) {
+    if (_sortField === field) {
+      _sortAsc = !_sortAsc;
+    } else {
+      _sortField = field;
+      _sortAsc = (field === 'agent' || field === 'guestName' ? true : false);
+    }
+    _page = 1;
+    _rerender();
+  }
+
+  function toggleExpand(val) {
+    _expandAll = val;
+    _page = 1;
+    _rerender();
   }
 
   function _agentMatrixTable(bookings) {
@@ -80,7 +134,6 @@ var AgentPerfPage = (function () {
     }
     agents.sort(function (x, y) { return y.total - x.total; });
 
-    /* Collect all casinos from data + preset */
     var casinos = CASINO_ORDER.slice();
     for (var ag in matrix) {
       for (var ck in matrix[ag]) {
@@ -109,7 +162,6 @@ var AgentPerfPage = (function () {
       grandTotal += (row._total || 0);
     }
 
-    /* Totals row */
     html += '<tr style="background:var(--bg-base);font-weight:700;"><td>合計</td>';
     for (var ck2 = 0; ck2 < casinos.length; ck2++) {
       var colTotal = 0;
@@ -124,18 +176,32 @@ var AgentPerfPage = (function () {
     return html;
   }
 
-  function _rankingTable(items, field, label) {
+  function _rankingTable(items, field, label, extraField, extraLabel) {
     if (!items || items.length === 0) return _emptyStateMini('暫無數據');
 
     var html = '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint scrollable">';
-    html += '<table class="data-table"><thead><tr><th>#</th><th>代理</th><th class="num-cell">' + label + '</th></tr></thead><tbody>';
+    html += '<table class="data-table"><thead><tr><th>#</th><th>代理</th>';
+    html += '<th class="num-cell">' + label + '</th>';
+    if (extraField) {
+      html += '<th class="num-cell">' + extraLabel + '</th>';
+    }
+    html += '</tr></thead><tbody>';
 
     for (var i = 0; i < items.length; i++) {
       var rank = i + 1;
       var rankIcon = rank === 1 ? '\uD83E\uDD47' : rank === 2 ? '\uD83E\uDD48' : rank === 3 ? '\uD83E\uDD49' : rank;
       html += '<tr><td style="text-align:center;">' + rankIcon + '</td>';
       html += '<td style="font-weight:600;">' + Utils.escapeHtml(items[i][field]) + '</td>';
-      html += '<td class="num-cell">' + items[i].count + '</td></tr>';
+      html += '<td class="num-cell">' + items[i].count + '</td>';
+      if (extraField) {
+        var ev = items[i][extraField];
+        if (extraField === 'requiredVolume') {
+          html += '<td class="num-cell">' + (ev ? Math.round(ev / 10000) + ' 萬' : '-') + '</td>';
+        } else {
+          html += '<td class="num-cell">' + (ev ? Utils.formatCurrency(ev, 'HKD') : '-') + '</td>';
+        }
+      }
+      html += '</tr>';
     }
 
     html += '</tbody></table></div></div>';
@@ -172,20 +238,22 @@ var AgentPerfPage = (function () {
   function _detailTable(bookings) {
     if (!bookings || bookings.length === 0) return _emptyStateMini('暫無數據');
 
-    /* Sort by agent, then checkIn */
-    var sorted = bookings.slice().sort(function (a, b) {
-      var agentA = (a.agent || '').toLowerCase();
-      var agentB = (b.agent || '').toLowerCase();
-      if (agentA !== agentB) return agentA < agentB ? -1 : 1;
-      return (a.checkIn || '') < (b.checkIn || '') ? -1 : 1;
-    });
+    /* Search → Sort → Page */
+    var searched = Paginator.filterBySearch(bookings, _search);
+    var sorted = Paginator.sortBy(searched, _sortField, _sortAsc);
+    var pageData = Paginator.getPage(sorted, _page, _expandAll);
+    var pages = Paginator.totalPages(sorted, _expandAll);
 
-    var html = '<div style="margin-bottom:var(--sp-2);color:var(--text-muted);font-size:var(--fs-xs);">';
-    html += '折抵天數 = 客戶轉碼 ÷ 每晚門檻（無條件退位）。轉碼金額請至「費用收取」頁面填寫。';
-    html += '</div>';
-    html += '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint scrollable">';
+    if (sorted.length === 0) {
+      return '<div style="padding:var(--sp-4);text-align:center;color:var(--text-muted);font-size:var(--fs-sm);">無匹配結果</div>';
+    }
+
+    var html = '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint scrollable">';
     html += '<table class="data-table"><thead><tr>';
-    html += '<th>代理</th><th>客人</th><th>酒店</th><th>入住</th>';
+    html += Paginator.renderTH('代理', 'agent', _sortField, _sortAsc, 'AgentPerfPage.sortByCol');
+    html += Paginator.renderTH('客人', 'guestName', _sortField, _sortAsc, 'AgentPerfPage.sortByCol');
+    html += '<th>酒店</th>';
+    html += Paginator.renderTH('入住', 'checkIn', _sortField, _sortAsc, 'AgentPerfPage.sortByCol');
     html += '<th style="text-align:center;width:60px;">入住天數</th>';
     html += '<th style="text-align:right;width:60px;">每晚(萬)</th>';
     html += '<th style="text-align:right;width:70px;">總門檻(萬)</th>';
@@ -195,8 +263,8 @@ var AgentPerfPage = (function () {
     html += '<th>狀態</th>';
     html += '</tr></thead><tbody>';
 
-    for (var i = 0; i < sorted.length; i++) {
-      var b = sorted[i];
+    for (var i = 0; i < pageData.length; i++) {
+      var b = pageData[i];
       var th = Number(b.threshold) || 0;
       var n = Number(b.nights) || 0;
       var totalTh = th * n;
@@ -206,7 +274,6 @@ var AgentPerfPage = (function () {
       var vol = Number(b.volume) || 0;
       var volWan = vol > 0 ? Math.round(vol / 10000) : 0;
 
-      /* Discount days = floor(volume / threshold) */
       var discountDays = 0;
       if (vol > 0 && th > 0) {
         discountDays = Math.floor(vol / th);
@@ -243,6 +310,10 @@ var AgentPerfPage = (function () {
     }
 
     html += '</tbody></table></div></div>';
+
+    /* Pagination nav */
+    html += Paginator.renderNav(_page, pages, sorted.length, 'AgentPerfPage.goPage');
+
     return html;
   }
 
@@ -276,7 +347,13 @@ var AgentPerfPage = (function () {
     return '<div style="padding:var(--sp-6);text-align:center;color:var(--text-muted);font-size:var(--fs-sm);">' + Utils.escapeHtml(text) + '</div>';
   }
 
-  return { render: render };
+  return {
+    render: render,
+    goPage: goPage,
+    onSearch: onSearch,
+    sortByCol: sortByCol,
+    toggleExpand: toggleExpand
+  };
 })();
 
 function renderAgentPerformance() { AgentPerfPage.render(); }

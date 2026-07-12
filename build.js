@@ -51,6 +51,7 @@ var JS_FILES = [
   'src/ui/keyboard.js',
   'src/ui/toast.js',
   'src/ui/modal.js',
+  'src/ui/paginator.js',
   /* Page layer — v8: 7 pages */
   'src/pages/overview.js',
   'src/pages/profit.js',
@@ -345,16 +346,16 @@ function runTests() {
     assert(tpl.indexOf('#f0f2f5') !== -1, 'Should use light theme-color #f0f2f5');
   });
 
-  test('Template version label is v2.1.8', function () {
+  test('Template version label is v2.2.0', function () {
     var tpl = readFile(TEMPLATE);
-    assert(tpl.indexOf('v2.1.8') !== -1, 'Version label should be v2.1.8');
+    assert(tpl.indexOf('v2.2.0') !== -1, 'Version label should be v2.2.0');
   });
 
   /* ===== Test: constants.js defines required constants ===== */
   test('constants.js defines APP', function () {
     var src = getSrc('src/core/constants.js');
     assert(src.indexOf('var APP') !== -1, 'Missing APP');
-    assert(src.indexOf("VERSION: '2.1.8'") !== -1, 'APP.VERSION should be 2.1.8');
+    assert(src.indexOf("VERSION: '2.2.0'") !== -1, 'APP.VERSION should be 2.2.0');
   });
 
   test('constants.js defines CONFIG with v8 settings', function () {
@@ -685,6 +686,47 @@ function runTests() {
     assert(src.indexOf('confirmNo') !== -1, 'Missing confirmNo field');
     assert(src.indexOf('employee') !== -1, 'Missing employee field');
     assert(src.indexOf('archived') !== -1, 'Missing archived field');
+  });
+
+  /* ===== Test: checked-out deferred archiving (v2.2.0) ===== */
+  test('constants.js: checked-out NOT in toArchive (deferred archiving)', function () {
+    var src = getSrc('src/core/constants.js');
+    assert(src.indexOf("toArchive: ['cancelled']") !== -1, 'toArchive should only contain cancelled');
+    assert(src.indexOf("toArchive: ['checked-out', 'cancelled']") === -1, 'toArchive should NOT contain checked-out');
+    assert(src.indexOf('CHECKOUT_OVERDUE_DAYS') !== -1, 'Missing CHECKOUT_OVERDUE_DAYS config');
+  });
+
+  test('bot.js: checked-out NOT in toArchive (deferred archiving)', function () {
+    var src = getSrc('bot/bot.js');
+    assert(src.indexOf("toArchive:    ['cancelled']") !== -1, 'Bot toArchive should only contain cancelled');
+    assert(src.indexOf("toArchive:    ['checked-out', 'cancelled']") === -1, 'Bot toArchive should NOT contain checked-out');
+    assert(src.indexOf('sendTodayCheckOutReminders') !== -1, 'Missing sendTodayCheckOutReminders function');
+    assert(src.indexOf('EMPLOYEE_ROLES.ADMIN') !== -1, 'Checkout reminder should filter by admin role');
+  });
+
+  test('profit.js: batch archive features (v2.2.0)', function () {
+    var src = getSrc('src/pages/profit.js');
+    assert(src.indexOf('_selectedSet') !== -1, 'Missing _selectedSet for batch selection');
+    assert(src.indexOf('toggleSelect:') !== -1, 'Missing toggleSelect method');
+    assert(src.indexOf('togglePendingFilter:') !== -1, 'Missing togglePendingFilter method');
+    assert(src.indexOf('batchArchive:') !== -1, 'Missing batchArchive method');
+    assert(src.indexOf('clearSelection:') !== -1, 'Missing clearSelection method');
+    assert(src.indexOf('_filterPending') !== -1, 'Missing _filterPending state');
+    assert(src.indexOf('CHECKOUT_OVERDUE_DAYS') !== -1, 'Missing overdue check');
+    assert(src.indexOf('archive-checkbox') !== -1, 'Missing checkbox class');
+    assert(src.indexOf('colspan="4"') !== -1, 'Summary row colspan should be 4 (was 3)');
+  });
+
+  test('bridge.js: batch archive functions defined', function () {
+    var src = getSrc('src/bridge/bridge.js');
+    assert(src.indexOf('function confirmBatchArchive') !== -1, 'Missing confirmBatchArchive function');
+    assert(src.indexOf('function executeBatchArchive') !== -1, 'Missing executeBatchArchive function');
+  });
+
+  test('overview.js: pending settlement label (v2.2.0)', function () {
+    var src = getSrc('src/pages/overview.js');
+    assert(src.indexOf('已退房（待結算）') !== -1, 'Should label checked-out as pending settlement');
+    assert(src.indexOf('checkoutCount > 0') !== -1, 'Should highlight when checkout count > 0');
   });
 
   /* ===== Test: employees.js defines Employee CRUD ===== */

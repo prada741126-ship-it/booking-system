@@ -625,8 +625,89 @@ function clearAllData() {
 }
 
 /* ============================================================
- * Month Seal / Unseal Actions (v2.1.6)
+ * Batch Archive — Confirm and Archive Multiple Bookings
  * ============================================================ */
+
+function confirmBatchArchive(items) {
+  if (!items || items.length === 0) return;
+
+  /* Build confirmation modal body listing all selected bookings */
+  var body = '<div style="margin-bottom:var(--sp-3);color:var(--text-secondary);font-size:var(--fs-sm);">';
+  body += '以下 <b>' + items.length + '</b> 筆已退房訂房將被歸檔，歸檔後可在「歷史核帳」頁面查看：';
+  body += '</div>';
+
+  body += '<div class="data-table-wrap" style="max-height:300px;overflow-y:auto;"><div class="data-table-scroll"><table class="data-table"><thead><tr>';
+  body += '<th>客人</th><th>酒店</th><th>退房日期</th><th>費用</th>';
+  body += '</tr></thead><tbody>';
+
+  for (var i = 0; i < items.length; i++) {
+    var b = items[i];
+    body += '<tr>';
+    body += '<td style="font-weight:600;">' + Utils.escapeHtml(b.guestName || '-') + '</td>';
+    body += '<td style="font-size:var(--fs-sm);">' + Utils.escapeHtml(b.hotel || '-') + '</td>';
+    body += '<td style="font-size:var(--fs-sm);">' + Utils.formatDateDisplay(b.checkOut) + '</td>';
+    body += '<td><span class="fee-badge ' + (b.feeStatus || 'free') + '">' + (FEE_TYPE_LABELS[b.feeStatus] || '免費') + '</span></td>';
+    body += '</tr>';
+  }
+
+  body += '</tbody></table></div></div>';
+
+  body += '<div style="margin-top:var(--sp-3);padding:var(--sp-3);background:rgba(239,68,68,0.06);border-radius:var(--radius-md);font-size:var(--fs-sm);color:var(--text-secondary);">';
+  body += '\u26a0\ufe0f \u6b78\u6a94\u5f8c\u8a02\u623f\u5c07\u5f9e\u5217\u8868\u4e2d\u6d88\u5931\uff0c\u8acb\u78ba\u8a8d\u5df2\u5b8c\u6210\u6240\u6709\u8cbb\u7528\u7d50\u7b97\u3002';
+  body += '</div>';
+
+  var footer = '<button class="btn btn-secondary" data-modal-close>\u53d6\u6d88</button>';
+  footer += '<button class="btn btn-danger" onclick="executeBatchArchive()">\u78ba\u8a8d\u6b78\u6a94</button>';
+
+  /* Store items for the confirm handler */
+  window._batchArchiveItems = items;
+
+  Modal.open({
+    title: '\u78ba\u8a8d\u6b78\u6a94 ' + items.length + ' \u7b46\u8a02\u623f',
+    body: body,
+    footer: footer,
+    size: 'md'
+  });
+}
+
+function executeBatchArchive() {
+  var items = window._batchArchiveItems;
+  if (!items || items.length === 0) return;
+
+  var successCount = 0;
+  var failCount = 0;
+  for (var i = 0; i < items.length; i++) {
+    try {
+      var result = Bookings.archive(items[i]._fbKey);
+      if (result) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    } catch (e) {
+      console.error('[BatchArchive] Error archiving:', items[i]._fbKey, e);
+      failCount++;
+    }
+  }
+
+  /* Clear selection */
+  if (typeof ProfitPage !== 'undefined' && ProfitPage.clearSelection) {
+    ProfitPage.clearSelection();
+  }
+
+  window._batchArchiveItems = null;
+  Modal.close();
+
+  if (failCount === 0) {
+    Toast.success(successCount + ' \u7b46\u8a02\u623f\u5df2\u6b78\u6a94');
+  } else {
+    Toast.show('\u6b78\u6a94\u5b8c\u6210\uff1a' + successCount + ' \u6210\u529f\uff0c' + failCount + ' \u5931\u6557', 'warning');
+  }
+
+  Events.emit(EVENTS.UI_RENDER);
+}
+
+
 
 function sealMonthAction(monthStr) {
   Modal.confirm(

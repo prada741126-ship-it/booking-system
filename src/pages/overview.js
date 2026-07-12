@@ -1,9 +1,16 @@
 /**
  * overview.js — Overview / Dashboard Page
- * Booking System v2.0.0 (v8 spec)
- * Renders: KPI cards (bookings/nights/threshold/profit) + status distribution + recent bookings + fee breakdown
+ * Booking System v2.2.0
+ * Renders: KPI cards (bookings/nights/threshold/profit) + status distribution + paginated booking list + fee breakdown
  */
 var OverviewPage = (function () {
+
+  /* Pagination state */
+  var _page = 1;
+  var _search = '';
+  var _sortField = 'checkIn';
+  var _sortAsc = false;  /* default: checkIn desc (newest first) */
+  var _expandAll = false;
 
   function render() {
     var container = document.getElementById('page-overview');
@@ -18,8 +25,11 @@ var OverviewPage = (function () {
     var monthlyKPIs = Stats.calcMonthlyNights(monthBookings, month);
     var total = summ.totalBookings; /* used for status distribution percentages */
 
-    /* Recent bookings: filtered by check-in month (original logic), but show creation date */
-    var recent = Filters.sortBookings(monthBookings, '_createdAt', false).slice(0, 8);
+    /* Paginated data */
+    var searched = Paginator.filterBySearch(monthBookings, _search);
+    var sorted = Paginator.sortBy(searched, _sortField, _sortAsc);
+    var pageData = Paginator.getPage(sorted, _page, _expandAll);
+    var pages = Paginator.totalPages(sorted, _expandAll);
 
     var html = '';
 
@@ -50,7 +60,7 @@ var OverviewPage = (function () {
 
     html += '</div>';
 
-    /* Second row: status distribution + recent bookings */
+    /* Second row: status distribution + fee breakdown */
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4);margin-bottom:var(--sp-4);">';
 
     /* Status distribution */
@@ -63,7 +73,10 @@ var OverviewPage = (function () {
     html += _statusRow('待確認', sc.pending || 0, total, UI_COLORS.statusPending);
     html += _statusRow('已確認', sc.confirmed || 0, total, UI_COLORS.statusConfirmed);
     html += _statusRow('已入住', sc['checked-in'] || 0, total, UI_COLORS.statusCheckedIn);
-    html += _statusRow('已退房', sc['checked-out'] || 0, total, UI_COLORS.statusCheckedOut);
+    /* Checked-out: highlight in red when pending settlement (count > 0) */
+    var checkoutCount = sc['checked-out'] || 0;
+    var checkoutColor = checkoutCount > 0 ? UI_COLORS.danger : UI_COLORS.statusCheckedOut;
+    html += _statusRow('已退房（待結算）', checkoutCount, total, checkoutColor);
     html += _statusRow('已取消', sc.cancelled || 0, total, UI_COLORS.statusCancelled);
     html += '</div>';
 
@@ -87,40 +100,89 @@ var OverviewPage = (function () {
 
     html += '</div>';
 
-    /* Recent bookings */
+    /* ===== Paginated Booking List ===== */
     html += '<div class="card">';
     html += '  <div class="card-title">';
     html += '    <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg></div>';
-    html += '    最近訂房';
+    html += '    訂房明細';
+    html += '    <span style="font-size:var(--fs-xs);color:var(--text-muted);font-weight:400;margin-left:var(--sp-2);">' + sorted.length + ' 筆</span>';
     html += '  </div>';
 
-    if (recent.length === 0) {
+    /* Toolbar: search + expand toggle */
+    html += Paginator.renderToolbar(
+      Paginator.renderSearch(_search, 'OverviewPage.onSearch', '搜索客人姓名、代理、酒店、體系...'),
+      Paginator.renderExpandToggle(_expandAll, 'OverviewPage.toggleExpand')
+    );
+
+    if (sorted.length === 0) {
       html += _emptyStateMini('暫無訂房記錄，點擊「新增訂房」開始');
     } else {
-      html += '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint' + (recent.length > 0 ? ' scrollable' : '') + '">';
+      html += '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint scrollable">';
       html += '<table class="data-table"><thead><tr>';
-      html += '<th>客人</th><th>體系</th><th>入住</th><th>退房</th><th style="text-align:center;">入住天數</th><th>代理</th><th>費用</th><th>狀態</th><th>創建日期</th><th>登錄人</th>';
+      html += Paginator.renderTH('客人', 'guestName', _sortField, _sortAsc, 'OverviewPage.sortByCol');
+      html += Paginator.renderTH('體系', 'casino', _sortField, _sortAsc, 'OverviewPage.sortByCol');
+      html += Paginator.renderTH('入住', 'checkIn', _sortField, _sortAsc, 'OverviewPage.sortByCol');
+      html += '<th>退房</th>';
+      html += '<th style="text-align:center;">入住天數</th>';
+      html += Paginator.renderTH('代理', 'agent', _sortField, _sortAsc, 'OverviewPage.sortByCol');
+      html += '<th>費用</th><th>狀態</th>';
+      html += Paginator.renderTH('創建日期', '_createdAt', _sortField, _sortAsc, 'OverviewPage.sortByCol');
+      html += '<th>登錄人</th>';
       html += '</tr></thead><tbody>';
-      for (var i = 0; i < recent.length; i++) {
-        html += _recentRow(recent[i]);
+
+      for (var i = 0; i < pageData.length; i++) {
+        html += _recentRow(pageData[i]);
       }
+
       html += '</tbody></table></div></div>';
+
+      /* Pagination nav */
+      html += Paginator.renderNav(_page, pages, sorted.length, 'OverviewPage.goPage');
     }
     html += '</div>';
 
     container.innerHTML = html;
   }
 
+  /* ===== Re-render helpers (for pagination controls) ===== */
+  function _rerender() {
+    render();
+  }
+
+  function goPage(n) {
+    _page = n;
+    _rerender();
+  }
+
+  function onSearch(term) {
+    _search = term;
+    _page = 1;
+    _rerender();
+  }
+
+  function sortByCol(field) {
+    if (_sortField === field) {
+      _sortAsc = !_sortAsc;
+    } else {
+      _sortField = field;
+      _sortAsc = (field === 'checkIn' ? false : true);
+    }
+    _page = 1;
+    _rerender();
+  }
+
+  function toggleExpand(val) {
+    _expandAll = val;
+    _page = 1;
+    _rerender();
+  }
+
   /* ===== Build seal/unseal label for the page header ===== */
-  /* Current month: no label */
-  /* Past month not sealed: gray "封存" clickable label */
-  /* Sealed month: green "已封存" + "解封" link */
   function _buildSealLabel(month) {
     var currentMonth = Utils.currentMonth();
     if (month === currentMonth) return '';
 
     if (State.isMonthClosed(month)) {
-      /* Sealed: green badge + unseal link */
       return ' <span style="display:inline-block;padding:2px 8px;border-radius:var(--radius-full);' +
         'background:rgba(22,163,74,0.1);color:#16a34a;font-size:var(--fs-xs);font-weight:600;' +
         'margin-left:var(--sp-2);vertical-align:middle;">已封存</span>' +
@@ -128,7 +190,6 @@ var OverviewPage = (function () {
         'style="font-size:var(--fs-xs);color:var(--text-muted);margin-left:4px;text-decoration:underline;">解封</a>';
     }
 
-    /* Past month not sealed: gray "封存" clickable label */
     return ' <a href="javascript:void(0)" onclick="sealMonthAction(\'' + month + '\')" ' +
       'style="display:inline-block;padding:2px 8px;border-radius:var(--radius-full);' +
       'background:var(--bg-base);color:var(--text-muted);font-size:var(--fs-xs);font-weight:500;' +
@@ -197,7 +258,6 @@ var OverviewPage = (function () {
     var paidColor = '#f59e0b';
 
     var html = '<div style="display:flex;align-items:center;gap:var(--sp-4);">';
-    /* Donut chart using conic-gradient */
     html += '<div style="width:110px;height:110px;border-radius:50%;';
     html += 'background:conic-gradient(' + freeColor + ' 0% ' + freePct.toFixed(1) + '%, ' + paidColor + ' ' + freePct.toFixed(1) + '% 100%);';
     html += 'display:flex;align-items:center;justify-content:center;flex-shrink:0;';
@@ -206,7 +266,6 @@ var OverviewPage = (function () {
     html += '<span style="font-size:var(--fs-xl);font-weight:var(--fw-extrabold);color:var(--text-primary);">' + total + '</span>';
     html += '<span style="font-size:var(--fs-xs);color:var(--text-muted);">總房數</span>';
     html += '</div></div>';
-    /* Legend */
     html += '<div style="flex:1;">';
     html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:var(--sp-2);">';
     html += '<span style="width:10px;height:10px;border-radius:2px;background:' + freeColor + ';flex-shrink:0;"></span>';
@@ -236,7 +295,6 @@ var OverviewPage = (function () {
     return html;
   }
 
-  /* Format timestamp (Date.now) to MM/DD */
   function _fmtTimestamp(ts) {
     if (!ts) return '-';
     var d = new Date(ts);
@@ -254,7 +312,13 @@ var OverviewPage = (function () {
            Utils.escapeHtml(text) + '</div>';
   }
 
-  return { render: render };
+  return {
+    render: render,
+    goPage: goPage,
+    onSearch: onSearch,
+    sortByCol: sortByCol,
+    toggleExpand: toggleExpand
+  };
 })();
 
 function renderOverview() { OverviewPage.render(); }

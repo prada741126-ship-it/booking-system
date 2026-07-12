@@ -1640,3 +1640,160 @@ textarea.form-control {
   font-size: var(--fs-xs);
   color: var(--text-muted);
 }
+
+/* ===== Paginator (v2.2.0) ===== */
+.paginator-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  margin-top: var(--sp-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.paginator-info {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.paginator-btns {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.paginator-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 32px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: all var(--tr-fast);
+  user-select: none;
+}
+
+.paginator-btn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.paginator-btn-active {
+  background: var(--grad-primary);
+  color: white;
+  border-color: var(--color-primary);
+  font-weight: var(--fw-bold);
+}
+
+.paginator-btn-active:hover {
+  background: var(--grad-primary);
+  color: white;
+}
+
+.paginator-btn-disabled,
+.paginator-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.paginator-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  user-select: none;
+}
+
+.paginator-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: all var(--tr-fast);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.paginator-expand-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.paginator-expand-btn.active {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* Sortable table headers */
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--tr-fast);
+}
+
+.sortable-th:hover {
+  color: var(--color-primary);
+}
+
+.sort-arrow {
+  font-size: var(--fs-xs);
+  color: var(--color-primary);
+  margin-left: 2px;
+}
+
+/* ===== Batch Archive & Checkbox Styles (v2.2.0) ===== */
+.batch-archive-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.archive-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+  vertical-align: middle;
+}
+
+.archive-checkbox:hover {
+  opacity: 0.8;
+}
+
+.pending-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--sp-2);
+  border-radius: var(--radius-full);
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}

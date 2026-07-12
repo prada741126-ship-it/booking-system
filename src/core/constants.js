@@ -6,7 +6,7 @@
 
 /* ===== App Info ===== */
 var APP = {
-  VERSION: '2.1.8',
+  VERSION: '2.2.0',
   TITLE: 'VIP Booking System',
   SYSTEM_NAME: 'BookingHub'
 };
@@ -23,7 +23,8 @@ var CONFIG = {
   REMINDER_DAYS_BEFORE: 3,   // remind 3 days before check-in
   DAILY_SCAN_TIME: '09:00',  // daily status scan at 9am
   RECENT_AGENT_LIMIT: 5,     // remember last 5 agents per employee
-  ARCHIVE_AUTO_DAYS: 0      // auto-archive immediately on checkout/cancel
+  CHECKOUT_OVERDUE_DAYS: 7,  // checked-out bookings older than this are marked overdue
+  ARCHIVE_AUTO_DAYS: 0,     // cancelled auto-archive immediately; checked-out deferred to manual
 };
 
 /* ===== Storage Keys ===== */
@@ -269,8 +270,8 @@ var STATUS_AUTO_TRANSITION = {
   toCheckedIn: ['pending', 'confirmed'],
   /* If checkOut date <= today and status is checked-in -> checked-out */
   toCheckedOut: ['checked-in'],
-  /* checked-out & cancelled -> auto archive */
-  toArchive: ['checked-out', 'cancelled']
+  /* cancelled -> auto archive immediately; checked-out stays active for manual settlement */
+  toArchive: ['cancelled']
 };
 
 /* ===== Room Fee Rate (auto-calc) ===== */

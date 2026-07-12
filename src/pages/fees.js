@@ -1,12 +1,31 @@
 /**
  * fees.js — Fee Collection Page (Ctrl+3)
- * Booking System v2.0.8
+ * Booking System v2.2.0
  * Accountant fills volume → auto-calc discount/remaining → auto-determine fee status → fill charge amount
  * Silent save: updates DOM in-place without full page re-render
+ * Pagination: 10 per page, search, sort, expand all
  */
 var FeesPage = (function () {
 
   var _filterFee = '';  /* '', 'free', 'paid' */
+
+  /* Pagination state */
+  var _page = 1;
+  var _search = '';
+  var _sortField = 'agent';
+  var _sortAsc = true;
+  var _expandAll = false;
+
+  /* ===== Data helper: returns {filtered, sorted, pageData} ===== */
+  function _getData() {
+    var month = State.get('workingMonth') || Utils.currentMonth();
+    var monthBookings = Filters.filterBookings(Bookings.getAll(), { month: month });
+    var filtered = _filterFee ? monthBookings.filter(function (b) { return b.feeStatus === _filterFee; }) : monthBookings;
+    var searched = Paginator.filterBySearch(filtered, _search);
+    var sorted = Paginator.sortBy(searched, _sortField, _sortAsc);
+    var pageData = Paginator.getPage(sorted, _page, _expandAll);
+    return { filtered: filtered, sorted: sorted, pageData: pageData };
+  }
 
   function render() {
     var container = document.getElementById('page-fees');
@@ -16,6 +35,9 @@ var FeesPage = (function () {
     var monthBookings = Filters.filterBookings(Bookings.getAll(), { month: month });
     var feeCounts = Stats.countByFeeStatus(monthBookings);
     var feeStatsData = Stats.feeStats(monthBookings);
+
+    var data = _getData();
+    var pages = Paginator.totalPages(data.sorted, _expandAll);
 
     var html = '';
 
@@ -43,11 +65,10 @@ var FeesPage = (function () {
     html += '</div>';
 
     /* Fee table */
-    var filtered = _filterFee ? monthBookings.filter(function (b) { return b.feeStatus === _filterFee; }) : monthBookings;
-    var sorted = _sortBookings(filtered);
-
     html += '<div class="card">';
-    html += '  <div class="card-title"><div class="card-icon"><svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V9H7z"/></svg></div>費用明細</div>';
+    html += '  <div class="card-title"><div class="card-icon"><svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V9H7z"/></svg></div>費用明細';
+    html += '    <span style="font-size:var(--fs-xs);color:var(--text-muted);font-weight:400;margin-left:var(--sp-2);">' + data.sorted.length + ' 筆</span>';
+    html += '  </div>';
 
     /* Formula hint */
     html += '<div style="margin-bottom:var(--sp-2);color:var(--text-muted);font-size:var(--fs-xs);">';
@@ -55,12 +76,21 @@ var FeesPage = (function () {
     html += '向客人收 = (剩餘天數 × 每晚門檻 ÷ 10萬) × ' + State.getRoomFeeRate() + ' 元（自動帶入，可手動修改）。';
     html += '</div>';
 
-    if (sorted.length === 0) {
+    /* Toolbar: search + expand toggle */
+    html += Paginator.renderToolbar(
+      Paginator.renderSearch(_search, 'FeesPage.onSearch', '搜索客人姓名、代理、酒店...'),
+      Paginator.renderExpandToggle(_expandAll, 'FeesPage.toggleExpand')
+    );
+
+    if (data.sorted.length === 0) {
       html += _emptyStateMini('暫無記錄');
     } else {
       html += '<div class="data-table-wrap"><div class="data-table-scroll scroll-hint scrollable">';
       html += '<table class="data-table"><thead><tr>';
-      html += '<th>代理</th><th>客人</th><th>酒店</th><th>入住</th>';
+      html += Paginator.renderTH('代理', 'agent', _sortField, _sortAsc, 'FeesPage.sortByCol');
+      html += Paginator.renderTH('客人', 'guestName', _sortField, _sortAsc, 'FeesPage.sortByCol');
+      html += '<th>酒店</th>';
+      html += Paginator.renderTH('入住', 'checkIn', _sortField, _sortAsc, 'FeesPage.sortByCol');
       html += '<th style="text-align:center;width:45px;">天數</th>';
       html += '<th style="text-align:right;width:50px;">每晚<br>(萬)</th>';
       html += '<th style="text-align:right;width:60px;">總門檻<br>(萬)</th>';
@@ -72,28 +102,73 @@ var FeesPage = (function () {
       html += '<th style="width:65px;">操作</th>';
       html += '</tr></thead><tbody id="fee-table-body">';
 
-      for (var i = 0; i < sorted.length; i++) {
-        html += _feeRow(sorted[i]);
+      for (var i = 0; i < data.pageData.length; i++) {
+        html += _feeRow(data.pageData[i]);
       }
 
-      /* Summary row */
-      html += _summaryRow(sorted);
+      /* Summary row — calculated from full filtered data */
+      html += _summaryRow(data.filtered);
 
       html += '</tbody></table></div></div>';
+
+      /* Pagination nav */
+      html += '<div id="fee-paginator-nav">';
+      html += Paginator.renderNav(_page, pages, data.sorted.length, 'FeesPage.goPage');
+      html += '</div>';
     }
     html += '</div>';
 
     container.innerHTML = html;
   }
 
-  /* ===== Sort by agent first, then checkIn ===== */
-  function _sortBookings(bookings) {
-    return bookings.slice().sort(function (a, b) {
-      var agentA = (a.agent || '').toLowerCase();
-      var agentB = (b.agent || '').toLowerCase();
-      if (agentA !== agentB) return agentA < agentB ? -1 : 1;
-      return (a.checkIn || '') < (b.checkIn || '') ? -1 : 1;
-    });
+  /* ===== Re-render body only (for pagination controls) ===== */
+  function _renderBody() {
+    var tbody = document.getElementById('fee-table-body');
+    if (!tbody) return;
+
+    var data = _getData();
+    var pages = Paginator.totalPages(data.sorted, _expandAll);
+
+    var html = '';
+    for (var i = 0; i < data.pageData.length; i++) {
+      html += _feeRow(data.pageData[i]);
+    }
+    html += _summaryRow(data.filtered);
+    tbody.innerHTML = html;
+
+    /* Update pagination nav */
+    var navContainer = document.getElementById('fee-paginator-nav');
+    if (navContainer) {
+      navContainer.innerHTML = Paginator.renderNav(_page, pages, data.sorted.length, 'FeesPage.goPage');
+    }
+  }
+
+  function goPage(n) {
+    _page = n;
+    _renderBody();
+  }
+
+  function onSearch(term) {
+    _search = term;
+    _page = 1;
+    _renderBody();
+  }
+
+  function sortByCol(field) {
+    if (_sortField === field) {
+      _sortAsc = !_sortAsc;
+    } else {
+      _sortField = field;
+      _sortAsc = (field === 'agent' || field === 'guestName' ? true : false);
+    }
+    _page = 1;
+    _renderBody();
+  }
+
+  function toggleExpand(val) {
+    _expandAll = val;
+    _page = 1;
+    _renderBody();
   }
 
   /* ===== Row builder ===== */
@@ -181,7 +256,6 @@ var FeesPage = (function () {
     return 0;
   }
 
-  /* ===== Auto-calc room fee: (remainingNights × threshold / 100000) × rate ===== */
   function _calcRoomFee(remainingNights, threshold) {
     if (remainingNights <= 0 || threshold <= 0) return 0;
     var rate = State.getRoomFeeRate();
@@ -328,13 +402,11 @@ var FeesPage = (function () {
           updateData.chargeGuest = 0;
           updateData.chargeCompany = 0;
         } else {
-          /* Auto-calc room fee for paid room */
           updateData.chargeGuest = _calcRoomFee(remaining, th);
         }
         var updated = Bookings.update(b._fbKey, updateData);
         if (updated) b = updated;
       } else if (newFeeStatus === FEE_TYPES.PAID) {
-        /* Already paid, but volume changed → recalc chargeGuest */
         var newFee = _calcRoomFee(remaining, th);
         if (newFee !== (Number(b.chargeGuest) || 0)) {
           var updated2 = Bookings.update(b._fbKey, { chargeGuest: newFee });
@@ -389,33 +461,14 @@ var FeesPage = (function () {
     }
   }
 
-  /* ===== Update summary row in-place ===== */
+  /* ===== Update summary row in-place — NOW CALCULATES FROM FULL DATA ===== */
   function _updateSummary() {
-    var tbody = document.getElementById('fee-table-body');
-    if (!tbody) return;
     var summaryRow = document.getElementById('fee-summary-row');
     if (!summaryRow) return;
 
-    /* Recalculate from all visible booking rows */
-    var dataRows = tbody.querySelectorAll('tr[data-fbkey]');
-    var totals = { nights: 0, discount: 0, remaining: 0, chargeGuest: 0 };
-
-    for (var i = 0; i < dataRows.length; i++) {
-      var fbKey = dataRows[i].getAttribute('data-fbkey');
-      var b = Bookings.getByKey(fbKey);
-      if (!b) continue;
-      var n = Number(b.nights) || 0;
-      var th = Number(b.threshold) || 0;
-      var vol = Number(b.volume) || 0;
-      var disc = _calcDiscount(vol, th);
-      var rem = n - disc;
-      totals.nights += n;
-      totals.discount += disc;
-      if (rem > 0) totals.remaining += rem;
-      if (b.feeStatus === 'paid') {
-        totals.chargeGuest += Number(b.chargeGuest) || 0;
-      }
-    }
+    /* Calculate from full filtered data, NOT from DOM rows */
+    var data = _getData();
+    var totals = _calcTotals(data.filtered);
 
     summaryRow.innerHTML = '<td colspan="4">合計</td>';
     summaryRow.innerHTML += '<td class="num-cell">' + totals.nights + '</td>';
@@ -460,9 +513,8 @@ var FeesPage = (function () {
     if (newFee === FEE_TYPES.FREE) {
       data.chargeGuest = 0;
       data.chargeCompany = 0;
-      data.feeManualOverride = true;  /* 手動設免費 → 鎖定，不被自動覆蓋 */
+      data.feeManualOverride = true;
     } else {
-      /* 手動改回收費 → 清除鎖定，恢復自動計算 */
       data.feeManualOverride = false;
       var b = Bookings.getByKey(fbKey);
       if (b) {
@@ -490,6 +542,8 @@ var FeesPage = (function () {
 
   function setFilter(fee) {
     _filterFee = fee;
+    _page = 1;
+    _search = '';
     render();
   }
 
@@ -515,6 +569,10 @@ var FeesPage = (function () {
 
   return {
     render: render,
+    goPage: goPage,
+    onSearch: onSearch,
+    sortByCol: sortByCol,
+    toggleExpand: toggleExpand,
     updateVolume: updateVolume,
     updateChargeGuest: updateChargeGuest,
     toggleFee: toggleFee,

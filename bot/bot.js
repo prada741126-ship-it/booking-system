@@ -114,7 +114,7 @@ var STATUS_RULES = {
 var STATUS_AUTO_TRANSITION = {
   toCheckedIn:  ['pending', 'confirmed'],
   toCheckedOut: ['checked-in'],
-  toArchive:    ['checked-out', 'cancelled']
+  toArchive:    ['cancelled']
 };
 
 var FEE_TYPES = { FREE: 'free', PAID: 'paid' };
@@ -2534,9 +2534,9 @@ function startQuery(userId, chatId, user) {
       return;
     }
 
-    /* Sort by checkIn date */
+    /* Sort by checkIn date ascending — nearest upcoming first */
     bookings.sort(function (a, b) {
-      return (b._createdAt || 0) - (a._createdAt || 0);
+      return (a.checkIn || '').localeCompare(b.checkIn || '');
     });
 
     /* Count by status */
@@ -2553,7 +2553,7 @@ function startQuery(userId, chatId, user) {
     text += '🟢 已入住：' + counts['checked-in'] + '\n';
     text += '⚪ 已退房：' + counts['checked-out'] + '\n';
     text += '❌ 已取消：' + counts.cancelled + '\n\n';
-    text += '<b>最近 10 笔：</b>\n\n';
+    text += '<b>最近入住 10 笔（按入住日期排序）：</b>\n\n';
 
     for (var j = 0; j < Math.min(bookings.length, 10); j++) {
       var b = bookings[j];
@@ -3260,7 +3260,7 @@ function dailyScan() {
         b.status = newStatus;
         b._updatedAt = Date.now();
 
-        /* Auto-archive if checked-out */
+        /* Auto-archive if cancelled (checked-out deferred to manual settlement) */
         if (STATUS_AUTO_TRANSITION.toArchive.indexOf(newStatus) !== -1) {
           b.archived = true;
           b.archivedAt = Date.now();
@@ -3388,6 +3388,9 @@ function dailyScan() {
 
     /* After scan, send today's check-in reminders to all employees */
     sendTodayCheckInReminders(data);
+
+    /* After scan, send today's check-out reminders to admins only */
+    sendTodayCheckOutReminders(data);
   });
 }
 
@@ -3534,6 +3537,86 @@ function sendTodayCheckInReminders(bookingsData) {
     _createdAt: Date.now(),
     action: 'today_checkin_reminder',
     message: 'Today check-in: ' + todayBookings.length + ' bookings, sent to ' + sentCount + ' employees'
+  });
+}
+
+/* ============================================================
+ * Today Check-out Reminder — Push to Admins Only
+ * ============================================================ */
+
+/**
+ * Send today's check-out list to admin employees only.
+ * Called after dailyScan() completes.
+ * Reminds admins to settle fees for bookings checking out today.
+ * Only non-archived bookings with checkOut === today.
+ */
+function sendTodayCheckOutReminders(bookingsData) {
+  console.log('[TodayCheckOut] Checking today\'s check-outs...');
+
+  var todayStr = today();
+  var todayCheckOuts = [];
+
+  for (var key in bookingsData) {
+    if (!bookingsData.hasOwnProperty(key)) continue;
+    var b = bookingsData[key];
+    if (!b || b._deleted || b.archived) continue;
+    if (b.status === BOOKING_STATUS.CANCELLED) continue;
+    if (b.checkOut === todayStr) {
+      todayCheckOuts.push(b);
+    }
+  }
+
+  if (todayCheckOuts.length === 0) {
+    console.log('[TodayCheckOut] No check-outs today.');
+    return;
+  }
+
+  /* Sort by guest name */
+  todayCheckOuts.sort(function (a, b) {
+    return (a.guestName || '').localeCompare(b.guestName || '');
+  });
+
+  /* Build message */
+  var text = '\u274c <b>\u4eca\u65e5\u9000\u623f\u63d0\u9192</b>\n\n';
+  text += '\u4eca\u65e5\u5171\u6709 <b>' + todayCheckOuts.length + '</b> \u7b46\u9000\u623f\uff0c\u8acb\u5b89\u6392\u8cbb\u7528\u7d50\u7b97\uff1a\n\n';
+
+  for (var i = 0; i < todayCheckOuts.length; i++) {
+    var b = todayCheckOuts[i];
+    var feeLabel = b.feeStatus === 'paid' ? '\u6536\u8cbb' : '\u514d\u8cbb';
+    text += (i + 1) + '. \u261d <b>' + escapeHtml(b.guestName || '-') + '</b>\n';
+    text += '   \ud83c\udfe8 ' + (b.casino || '') + ' / ' + (b.hotel || '') + ' / ' + getRoomLabel(b.roomType) + '\n';
+    text += '   \ud83d\udcc5 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?') + ' (' + (b.nights || 0) + '\u665a)\n';
+    text += '   \ud83d\udcb0 ' + feeLabel;
+    if (b.feeStatus === 'paid') {
+      text += ' / \u5411\u5ba2\u4eba\u6536\uff1a' + (b.chargeGuest || 0);
+    }
+    text += '\n';
+    if (b.agent) text += '   \ud83d\udc64 \u4ee3\u7406\uff1a' + escapeHtml(b.agent) + '\n';
+    text += '\n';
+  }
+
+  text += '\u8acb\u5728\u5229\u6f64\u7d50\u7b97\u9801\u9762\u78ba\u8a8d\u8cbb\u7528\u5f8c\u57f7\u884c\u6b78\u6a94\u3002';
+
+  /* Send to admins only */
+  var sentCount = 0;
+  if (cache.employeeList) {
+    for (var empKey in cache.employeeList) {
+      if (!cache.employeeList.hasOwnProperty(empKey)) continue;
+      var emp = cache.employeeList[empKey];
+      if (emp && emp.role === EMPLOYEE_ROLES.ADMIN && emp.active !== false && emp.tgId) {
+        sendMessage(emp.tgId, text);
+        sentCount++;
+      }
+    }
+  }
+
+  console.log('[TodayCheckOut] Sent to', sentCount, 'admins,', todayCheckOuts.length, 'check-outs today');
+
+  writeBotLog({
+    _fbKey: generateFbKey(),
+    _createdAt: Date.now(),
+    action: 'today_checkout_reminder',
+    message: 'Today check-out: ' + todayCheckOuts.length + ' bookings, sent to ' + sentCount + ' admins'
   });
 }
 

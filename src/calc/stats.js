@@ -317,7 +317,7 @@ var Stats = {
 
   /**
    * Profit grouped by agent
-   * @returns {Object} { '王大帥': { count: N, profit: N, chargeGuest: N, chargeCompany: N }, ... }
+   * @returns {Object} { '王大帥': { count: N, profit: N, chargeGuest: N, chargeCompany: N, requiredVolume: N }, ... }
    */
   profitByAgent: function (bookings) {
     var result = {};
@@ -325,11 +325,12 @@ var Stats = {
     for (var i = 0; i < bookings.length; i++) {
       var b = bookings[i];
       var agent = b.agent || '\u672A\u5206\u985E';
-      if (!result[agent]) result[agent] = { count: 0, profit: 0, chargeGuest: 0, chargeCompany: 0 };
+      if (!result[agent]) result[agent] = { count: 0, profit: 0, chargeGuest: 0, chargeCompany: 0, requiredVolume: 0 };
       result[agent].count++;
       result[agent].profit += Number(b.profit) || 0;
       result[agent].chargeGuest += Number(b.chargeGuest) || 0;
       result[agent].chargeCompany += Number(b.chargeCompany) || 0;
+      result[agent].requiredVolume += (Number(b.threshold) || 0) * (Number(b.nights) || 0);
     }
     return result;
   },
@@ -422,13 +423,13 @@ var Stats = {
 
   /**
    * Top agents by booking count
-   * @returns {Array} [{ agent: 'name', count: N, profit: N }, ...]
+   * @returns {Array} [{ agent: 'name', count: N, profit: N, requiredVolume: N }, ...]
    */
   topAgents: function (bookings, limit) {
     var profitMap = Stats.profitByAgent(bookings);
     var arr = [];
     for (var name in profitMap) {
-      arr.push({ agent: name, count: profitMap[name].count, profit: profitMap[name].profit });
+      arr.push({ agent: name, count: profitMap[name].count, profit: profitMap[name].profit, requiredVolume: profitMap[name].requiredVolume });
     }
     arr.sort(function (a, b) { return b.count - a.count; });
     if (limit) arr = arr.slice(0, limit);
