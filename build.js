@@ -732,6 +732,83 @@ function runTests() {
     assert(src.indexOf('Refused to archive cancelled booking') !== -1, 'Archives.add should refuse cancelled bookings');
   });
 
+  /* ===== Test: Bot/Web constants sync (prevent divergence) ===== */
+
+  test('Bot/Web sync: BOOKING_STATUS values match', function () {
+    var web = getSrc('src/core/constants.js');
+    var bot = getSrc('bot/bot.js');
+    var statuses = ['pending', 'confirmed', 'checked-in', 'checked-out', 'cancelled'];
+    for (var i = 0; i < statuses.length; i++) {
+      var s = statuses[i];
+      assert(web.indexOf("'" + s + "'") !== -1, 'Web BOOKING_STATUS missing value: ' + s);
+      assert(bot.indexOf("'" + s + "'") !== -1, 'Bot BOOKING_STATUS missing value: ' + s);
+    }
+  });
+
+  test('Bot/Web sync: STATUS_AUTO_TRANSITION arrays match', function () {
+    function extractArray(src, key) {
+      var m = src.match(new RegExp(key + ':\\s*\\[([^\\]]*)\\]'));
+      return m ? m[1].replace(/[\s']/g, '') : '__NOT_FOUND__';
+    }
+    var web = getSrc('src/core/constants.js');
+    var bot = getSrc('bot/bot.js');
+    var keys = ['toCheckedIn', 'toCheckedOut', 'toArchive'];
+    for (var i = 0; i < keys.length; i++) {
+      var w = extractArray(web, keys[i]);
+      var b = extractArray(bot, keys[i]);
+      assert(w !== '__NOT_FOUND__', 'Web STATUS_AUTO_TRANSITION missing: ' + keys[i]);
+      assert(b !== '__NOT_FOUND__', 'Bot STATUS_AUTO_TRANSITION missing: ' + keys[i]);
+      assert(w === b, keys[i] + ' mismatch — web=[' + w + '] bot=[' + b + ']');
+    }
+  });
+
+  test('Bot/Web sync: STATUS_RULES match for all statuses', function () {
+    function extractRule(src, status) {
+      /* Handle both bare keys (pending:) and quoted keys ('checked-in':) */
+      var key = status.indexOf('-') !== -1 ? "'" + status + "'" : status;
+      var m = src.match(new RegExp(key + ':\\s*\\{([^}]*)\\}'));
+      return m ? m[1].replace(/\s/g, '') : '__NOT_FOUND__';
+    }
+    var web = getSrc('src/core/constants.js');
+    var bot = getSrc('bot/bot.js');
+    var statuses = ['pending', 'confirmed', 'checked-in', 'checked-out', 'cancelled'];
+    for (var i = 0; i < statuses.length; i++) {
+      var w = extractRule(web, statuses[i]);
+      var b = extractRule(bot, statuses[i]);
+      assert(w !== '__NOT_FOUND__', 'Web STATUS_RULES missing: ' + statuses[i]);
+      assert(b !== '__NOT_FOUND__', 'Bot STATUS_RULES missing: ' + statuses[i]);
+      assert(w === b, 'STATUS_RULES mismatch for ' + statuses[i] + ' — web=[' + w + '] bot=[' + b + ']');
+    }
+  });
+
+  test('Bot/Web sync: FEE_TYPES, CURRENCY_DEFAULT, EMPLOYEE_ROLES match', function () {
+    var web = getSrc('src/core/constants.js');
+    var bot = getSrc('bot/bot.js');
+    /* FEE_TYPES */
+    assert(web.indexOf("FREE: 'free'") !== -1, 'Web FEE_TYPES.FREE missing');
+    assert(bot.indexOf("FREE: 'free'") !== -1, 'Bot FEE_TYPES.FREE missing');
+    assert(web.indexOf("PAID: 'paid'") !== -1, 'Web FEE_TYPES.PAID missing');
+    assert(bot.indexOf("PAID: 'paid'") !== -1, 'Bot FEE_TYPES.PAID missing');
+    /* CURRENCY_DEFAULT */
+    assert(web.indexOf("CURRENCY_DEFAULT = 'HKD'") !== -1, 'Web CURRENCY_DEFAULT missing');
+    assert(bot.indexOf("CURRENCY_DEFAULT = 'HKD'") !== -1, 'Bot CURRENCY_DEFAULT missing');
+    /* EMPLOYEE_ROLES */
+    assert(web.indexOf("ADMIN: 'admin'") !== -1, 'Web EMPLOYEE_ROLES.ADMIN missing');
+    assert(bot.indexOf("ADMIN: 'admin'") !== -1, 'Bot EMPLOYEE_ROLES.ADMIN missing');
+    assert(web.indexOf("STAFF: 'staff'") !== -1, 'Web EMPLOYEE_ROLES.STAFF missing');
+    assert(bot.indexOf("STAFF: 'staff'") !== -1, 'Bot EMPLOYEE_ROLES.STAFF missing');
+  });
+
+  test('Bot/Web sync: ROOM_TYPES values match (labels may differ)', function () {
+    var web = getSrc('src/core/constants.js');
+    var bot = getSrc('bot/bot.js');
+    var types = ['king', 'twin', 'mini-suite', 'grand-suite', 'two-bedroom', 'three-bedroom'];
+    for (var i = 0; i < types.length; i++) {
+      assert(web.indexOf("value: '" + types[i] + "'") !== -1, 'Web ROOM_TYPES missing value: ' + types[i]);
+      assert(bot.indexOf("value: '" + types[i] + "'") !== -1, 'Bot ROOM_TYPES missing value: ' + types[i]);
+    }
+  });
+
   test('profit.js: batch archive features (v2.2.0)', function () {
     var src = getSrc('src/pages/profit.js');
     assert(src.indexOf('_selectedSet') !== -1, 'Missing _selectedSet for batch selection');
