@@ -212,7 +212,7 @@ var ProfitPage = (function () {
     var isOverdue = false;
     if (isCheckOut && b.checkOut) {
       var todayStr = Utils.today();
-      var diffDays = Utils.daysBetween(todayStr, b.checkOut);
+      var diffDays = Utils.daysBetween(b.checkOut, todayStr);
       if (diffDays > CONFIG.CHECKOUT_OVERDUE_DAYS) {
         isOverdue = true;
       }
