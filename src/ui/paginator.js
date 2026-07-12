@@ -30,6 +30,9 @@ var Paginator = (function () {
       if (field === 'checkIn') {
         va = (a.checkIn || '');
         vb = (b.checkIn || '');
+      } else if (field === 'checkOut') {
+        va = (a.checkOut || '');
+        vb = (b.checkOut || '');
       } else if (field === 'guestName') {
         va = (a.guestName || '').toLowerCase();
         vb = (b.guestName || '').toLowerCase();

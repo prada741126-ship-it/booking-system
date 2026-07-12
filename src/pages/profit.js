@@ -1,6 +1,6 @@
 /**
  * profit.js — Profit Settlement Page (Ctrl+2)
- * Booking System v2.2.0
+ * Booking System v2.2.2
  * Accountant fills chargeCompany -> auto-calc profit = chargeGuest - chargeCompany
  * Only shows paid bookings (free bookings shown grayed out without input)
  * Silent save: updates DOM in-place without full page re-render
@@ -14,7 +14,7 @@ var ProfitPage = (function () {
   /* Pagination state */
   var _page = 1;
   var _search = '';
-  var _sortField = 'agent';
+  var _sortField = 'checkOut';
   var _sortAsc = true;
   var _expandAll = false;
 
@@ -120,6 +120,7 @@ var ProfitPage = (function () {
       html += Paginator.renderTH('代理', 'agent', _sortField, _sortAsc, 'ProfitPage.sortByCol');
       html += Paginator.renderTH('客人', 'guestName', _sortField, _sortAsc, 'ProfitPage.sortByCol');
       html += '<th>酒店</th>';
+      html += Paginator.renderTH('退房', 'checkOut', _sortField, _sortAsc, 'ProfitPage.sortByCol');
       html += '<th style="text-align:right;width:90px;">向客人收</th>';
       html += '<th style="text-align:right;width:90px;">交公司</th>';
       html += '<th style="text-align:right;width:90px;">利潤</th>';
@@ -184,7 +185,7 @@ var ProfitPage = (function () {
       _sortAsc = !_sortAsc;
     } else {
       _sortField = field;
-      _sortAsc = (field === 'agent' || field === 'guestName' ? true : false);
+      _sortAsc = (field === 'agent' || field === 'guestName' || field === 'checkOut' ? true : false);
     }
     _page = 1;
     _selectedSet.clear();
@@ -240,6 +241,7 @@ var ProfitPage = (function () {
     html += '<td style="font-weight:600;">' + Utils.escapeHtml(b.agent || '-') + '</td>';
     html += '<td>' + Utils.escapeHtml(b.guestName || '-') + '</td>';
     html += '<td style="font-size:var(--fs-sm);">' + Utils.escapeHtml(b.hotel || '-') + '</td>';
+    html += '<td style="font-size:var(--fs-sm);">' + Utils.formatDateDisplay(b.checkOut) + '</td>';
 
     /* Charge guest (read-only) */
     html += '<td class="num-cell cell-cg">';
@@ -294,7 +296,7 @@ var ProfitPage = (function () {
     var totals = _calcTotals(bookings);
 
     var html = '<tr id="profit-summary-row" style="background:var(--bg-base);font-weight:700;border-top:2px solid var(--border-default);">';
-    html += '<td colspan="4">合計</td>';
+    html += '<td colspan="5">合計</td>';
     html += '<td class="num-cell">' + Utils.formatCurrency(totals.chargeGuest, CURRENCY_DEFAULT) + '</td>';
     html += '<td class="num-cell">' + Utils.formatCurrency(totals.chargeCompany, CURRENCY_DEFAULT) + '</td>';
     html += '<td class="num-cell" style="color:' + (totals.profit >= 0 ? 'var(--color-success)' : 'var(--color-danger)') + ';">' + Utils.formatCurrency(totals.profit, CURRENCY_DEFAULT) + '</td>';
@@ -418,7 +420,7 @@ var ProfitPage = (function () {
     var data = _getData();
     var totals = _calcTotals(data.filtered);
 
-    summaryRow.innerHTML = '<td colspan="4">合計</td>';
+    summaryRow.innerHTML = '<td colspan="5">合計</td>';
     summaryRow.innerHTML += '<td class="num-cell">' + Utils.formatCurrency(totals.chargeGuest, CURRENCY_DEFAULT) + '</td>';
     summaryRow.innerHTML += '<td class="num-cell">' + Utils.formatCurrency(totals.chargeCompany, CURRENCY_DEFAULT) + '</td>';
     summaryRow.innerHTML += '<td class="num-cell" style="color:' + (totals.profit >= 0 ? 'var(--color-success)' : 'var(--color-danger)') + ';">' + Utils.formatCurrency(totals.profit, CURRENCY_DEFAULT) + '</td>';

@@ -346,16 +346,16 @@ function runTests() {
     assert(tpl.indexOf('#f0f2f5') !== -1, 'Should use light theme-color #f0f2f5');
   });
 
-  test('Template version label is v2.2.1', function () {
+  test('Template version label is v2.2.2', function () {
     var tpl = readFile(TEMPLATE);
-    assert(tpl.indexOf('v2.2.1') !== -1, 'Version label should be v2.2.1');
+    assert(tpl.indexOf('v2.2.2') !== -1, 'Version label should be v2.2.2');
   });
 
   /* ===== Test: constants.js defines required constants ===== */
   test('constants.js defines APP', function () {
     var src = getSrc('src/core/constants.js');
     assert(src.indexOf('var APP') !== -1, 'Missing APP');
-    assert(src.indexOf("VERSION: '2.2.1'") !== -1, 'APP.VERSION should be 2.2.1');
+    assert(src.indexOf("VERSION: '2.2.2'") !== -1, 'APP.VERSION should be 2.2.2');
   });
 
   test('constants.js defines CONFIG with v8 settings', function () {
@@ -742,7 +742,21 @@ function runTests() {
     assert(src.indexOf('_filterPending') !== -1, 'Missing _filterPending state');
     assert(src.indexOf('CHECKOUT_OVERDUE_DAYS') !== -1, 'Missing overdue check');
     assert(src.indexOf('archive-checkbox') !== -1, 'Missing checkbox class');
-    assert(src.indexOf('colspan="4"') !== -1, 'Summary row colspan should be 4 (was 3)');
+    assert(src.indexOf('colspan="5"') !== -1, 'Summary row colspan should be 5 (checkbox+agent+guest+hotel+checkout)');
+  });
+
+  test('profit.js: checkout date column + default sort (v2.2.2)', function () {
+    var src = getSrc('src/pages/profit.js');
+    assert(src.indexOf("_sortField = 'checkOut'") !== -1, 'Default sort should be checkOut');
+    assert(src.indexOf("_sortAsc = true") !== -1, 'Default sort should be ascending (oldest first)');
+    assert(src.indexOf("renderTH('退房', 'checkOut'") !== -1, 'Missing 退房 sortable column header');
+    assert(src.indexOf("formatDateDisplay(b.checkOut)") !== -1, 'Missing checkout date display in row');
+    assert(src.indexOf("field === 'checkOut'") !== -1, 'sortByCol should handle checkOut ascending default');
+  });
+
+  test('paginator.js: checkOut sort support (v2.2.2)', function () {
+    var src = getSrc('src/ui/paginator.js');
+    assert(src.indexOf("field === 'checkOut'") !== -1, 'sortBy should handle checkOut field');
   });
 
   test('bridge.js: batch archive functions defined', function () {
