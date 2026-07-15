@@ -228,8 +228,9 @@ var Hotels = {
 
   /**
    * Load preset configuration (called by App.initHotelConfig)
+   * @param {boolean} skipSync - if true, don't push to Firebase (used during init)
    */
-  loadPresets: function () {
+  loadPresets: function (skipSync) {
     var config = {
       version: PRESET_VERSION,
       _updatedAt: Date.now(),
@@ -237,13 +238,15 @@ var Hotels = {
     };
     State.set('hotelConfig', config);
     Store.saveHotelConfig(config);
-    try {
-      syncHCToFirebase(config);
-    } catch (e) {
-      console.error('[Hotels] syncHCToFirebase error (non-critical):', e);
+    if (!skipSync) {
+      try {
+        syncHCToFirebase(config);
+      } catch (e) {
+        console.error('[Hotels] syncHCToFirebase error (non-critical):', e);
+      }
     }
     Events.emit(EVENTS.HC_LOADED, config);
-    console.log('[Hotels] Presets loaded:', config.casinos.length, 'casinos');
+    console.log('[Hotels] Presets loaded:', config.casinos.length, 'casinos', skipSync ? '(skipSync)' : '');
     return config;
   },
 

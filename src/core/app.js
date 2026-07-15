@@ -65,8 +65,8 @@ var App = (function () {
     try {
       var hc = State.get('hotelConfig');
       if (!hc || !hc.casinos || hc.casinos.length === 0) {
-        console.log('[App] Hotel config empty, loading presets...');
-        Hotels.loadPresets();
+        console.log('[App] Hotel config empty, loading presets (skipSync)...');
+        Hotels.loadPresets(true); /* skipSync=true — don't overwrite Firebase */
       } else {
         console.log('[App] Hotel config loaded: ' + hc.casinos.length + ' casinos');
       }
@@ -74,7 +74,7 @@ var App = (function () {
       console.error('[App] initHotelConfig error:', e);
       /* Last resort: try loading presets directly */
       try {
-        Hotels.loadPresets();
+        Hotels.loadPresets(true); /* skipSync=true */
         console.log('[App] Hotel presets loaded after error recovery');
       } catch (e2) {
         console.error('[App] Hotel presets load also failed:', e2);
