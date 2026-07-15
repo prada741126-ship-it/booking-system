@@ -327,7 +327,7 @@ function encodeFbKey(str) {
     .replace(/@/g, '_');
 }
 
-/* Write a booking to Firebase */
+/* Write a booking to Firebase (full overwrite — use only for new bookings) */
 function writeBooking(booking, callback) {
   var key = booking._fbKey;
   fbPut(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(key), booking, function (err, result) {
@@ -336,6 +336,19 @@ function writeBooking(booking, callback) {
       if (callback) callback(err);
     } else {
       console.log('[FB] Booking written:', key);
+      if (callback) callback(null, result);
+    }
+  });
+}
+
+/* Patch specific fields of a booking to Firebase (partial update — avoids stale snapshot overwriting Web edits) */
+function patchBooking(fbKey, patchData, callback) {
+  fbPatch(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), patchData, function (err, result) {
+    if (err) {
+      console.error('[FB] Failed to patch booking:', fbKey, err);
+      if (callback) callback(err);
+    } else {
+      console.log('[FB] Booking patched:', fbKey, JSON.stringify(Object.keys(patchData)));
       if (callback) callback(null, result);
     }
   });
@@ -1905,13 +1918,18 @@ function handleConfirmNoInput(userId, chatId, text) {
       return;
     }
 
-    /* Update fields */
+    /* Update fields — PATCH only changed fields to avoid stale snapshot overwriting Web edits */
+    var confirmNoPatch = {
+      confirmNo: confirmNo,
+      status: BOOKING_STATUS.CONFIRMED,
+      _updatedAt: Date.now()
+    };
     booking.confirmNo = confirmNo;
     booking.status = BOOKING_STATUS.CONFIRMED;
-    booking._updatedAt = Date.now();
+    booking._updatedAt = confirmNoPatch._updatedAt;
 
-    /* Write back */
-    fbPut(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), booking, function (err2) {
+    /* Write back — partial update */
+    patchBooking(fbKey, confirmNoPatch, function (err2) {
       if (err2) {
         sendMessage(chatId, '❌ 更新失败：' + err2, mainMenuKB(getEmployeeByTgId(userId)));
         clearSession(userId);
@@ -2098,7 +2116,12 @@ function executeBulkConfirmNo(userId, chatId, matches) {
       booking.status = BOOKING_STATUS.CONFIRMED;
       booking._updatedAt = Date.now();
 
-      fbPut(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), booking, function (err2) {
+      var bulkConfirmPatch = {
+        confirmNo: m.confirmNo,
+        status: BOOKING_STATUS.CONFIRMED,
+        _updatedAt: booking._updatedAt
+      };
+      patchBooking(fbKey, bulkConfirmPatch, function (err2) {
         if (err2) {
           failed++;
           results.push({ ok: false, guestName: m.booking.guestName, confirmNo: m.confirmNo });
@@ -2300,16 +2323,17 @@ function handleModifyInput(userId, chatId, text) {
       return;
   }
 
-  /* Merge into booking */
+  /* Merge into booking (for Bot confirmation message display) */
   for (var k in updateData) {
     if (updateData.hasOwnProperty(k)) {
       booking[k] = updateData[k];
     }
   }
-  booking._updatedAt = Date.now();
+  updateData._updatedAt = Date.now();
+  booking._updatedAt = updateData._updatedAt;
 
-  /* Write back to Firebase */
-  fbPut(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), booking, function (err) {
+  /* Write back to Firebase — PATCH only changed fields to avoid stale snapshot overwriting Web edits */
+  patchBooking(fbKey, updateData, function (err) {
     if (err) {
       sendMessage(chatId, '❌ 更新失败：' + err, mainMenuKB(getEmployeeByTgId(userId)));
       clearSession(userId);
@@ -2560,10 +2584,14 @@ function toggleWorkStatus(chatId, userId, fbKey) {
     var current = booking.workStatus || WORK_STATUS.NOT_STARTED;
     var next = (current === WORK_STATUS.WORKING) ? WORK_STATUS.NOT_STARTED : WORK_STATUS.WORKING;
 
+    var wsPatch = {
+      workStatus: next,
+      _updatedAt: Date.now()
+    };
     booking.workStatus = next;
-    booking._updatedAt = Date.now();
+    booking._updatedAt = wsPatch._updatedAt;
 
-    writeBooking(booking, function (err2) {
+    patchBooking(fbKey, wsPatch, function (err2) {
       if (err2) {
         sendMessage(chatId, '❌ 更新失败，请稍后重试。', mainMenuKB(getEmployeeByTgId(userId)));
         return;
@@ -3375,14 +3403,18 @@ function dailyScan() {
         b.status = newStatus;
         b._updatedAt = Date.now();
 
+        var scanPatch = { status: newStatus, _updatedAt: b._updatedAt };
+
         /* Auto-archive if status in toArchive list (currently empty; cancelled → delete in 2nd loop) */
         if (STATUS_AUTO_TRANSITION.toArchive.indexOf(newStatus) !== -1) {
           b.archived = true;
           b.archivedAt = Date.now();
+          scanPatch.archived = true;
+          scanPatch.archivedAt = b.archivedAt;
         }
 
-        /* Write updated booking back */
-        fbPut(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(b._fbKey), b);
+        /* Write updated booking back — PATCH only changed fields */
+        fbPatch(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(b._fbKey), scanPatch);
 
         transitions.push({
           fbKey: b._fbKey,
