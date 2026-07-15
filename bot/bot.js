@@ -707,12 +707,9 @@ function getThreshold(casinoName, hotelName, roomType) {
   return (rc[roomType] && rc[roomType].threshold) ? rc[roomType].threshold : 0;
 }
 
-/* Default agent list (fallback when Firebase is empty) */
-var DEFAULT_AGENTS = ['王大帥', 'Fifi', 'Ring', 'Yuka', '安', '韓國'];
-
-/* Agent list helpers (from cache) */
+/* Agent list helpers (from cache) — no hardcoded fallback */
 function getActiveAgents() {
-  if (!cache.agentList) return DEFAULT_AGENTS.slice();
+  if (!cache.agentList) return [];
   var agents = [];
   for (var key in cache.agentList) {
     if (cache.agentList.hasOwnProperty(key)) {
@@ -722,8 +719,6 @@ function getActiveAgents() {
       }
     }
   }
-  /* Fallback to default if Firebase has data but all inactive or empty */
-  if (agents.length === 0) return DEFAULT_AGENTS.slice();
   return agents;
 }
 
@@ -1571,6 +1566,13 @@ function agentKB(employeeId) {
   var recent = getRecentAgents(employeeId);
   var allAgents = getActiveAgents();
   var rows = [];
+
+  /* If no agents available at all, show message */
+  if (allAgents.length === 0 && recent.length === 0) {
+    rows.push([{ text: '⚠️ 暂无代理，请先在Web端添加', callback_data: 'noop' }]);
+    rows.push([{ text: '⬅️ 返回', callback_data: 'book_back_room' }]);
+    return kb(rows);
+  }
 
   /* Recent agents first */
   if (recent.length > 0) {
