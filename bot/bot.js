@@ -135,6 +135,59 @@ var STATUS_AUTO_TRANSITION = {
 var FEE_TYPES = { FREE: 'free', PAID: 'paid' };
 var CURRENCY_DEFAULT = 'HKD';
 var EMPLOYEE_ROLES = { ADMIN: 'admin', STAFF: 'staff' };
+var BOOKINGS_PER_PAGE = 8;
+
+/* ============================================================
+ * Booking List Pagination Helper
+ * ============================================================ */
+
+function buildBookingListMessage(bookings, page, opts) {
+  var prefix     = opts.prefix;
+  var pagePrefix = opts.pagePrefix;
+  var title      = opts.title;
+  var cancelCb   = opts.cancelCb || 'book_cancel';
+  var showWork   = opts.showWork || false;
+  var extraNote  = opts.extraNote || '';
+
+  var total = bookings.length;
+  var totalPages = Math.max(1, Math.ceil(total / BOOKINGS_PER_PAGE));
+  if (page < 1) page = 1;
+  if (page > totalPages) page = totalPages;
+
+  var start = (page - 1) * BOOKINGS_PER_PAGE;
+  var end   = Math.min(start + BOOKINGS_PER_PAGE, total);
+
+  var text = title + '\n';
+  text += '📖 第 ' + page + '/' + totalPages + ' 页（共 ' + total + ' 笔）\n\n';
+
+  var rows = [];
+  for (var i = start; i < end; i++) {
+    var b = bookings[i];
+    var num = i + 1;
+    var wsIcon = '';
+    if (showWork) {
+      wsIcon = (WORK_STATUS_ICONS[b.workStatus || WORK_STATUS.NOT_STARTED] || '') + ' ';
+    }
+    text += num + '. ' + wsIcon + (STATUS_ICONS[b.status] || '') + ' <b>' + escapeHtml(b.guestName) + '</b> — ' + (b.casino || '') + ' / ' + getRoomLabel(b.roomType) + '\n';
+    text += '   📅 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?') + '\n';
+    rows.push([{ text: num + '. ' + b.guestName, callback_data: prefix + b._fbKey }]);
+  }
+
+  var navRow = [];
+  if (page > 1) {
+    navRow.push({ text: '⬅️ 上一页', callback_data: pagePrefix + (page - 1) });
+  }
+  if (page < totalPages) {
+    navRow.push({ text: '下一页 ➡️', callback_data: pagePrefix + (page + 1) });
+  }
+  if (navRow.length > 0) rows.push(navRow);
+
+  rows.push([{ text: '⬅️ 取消', callback_data: cancelCb }]);
+
+  text += '\n点击下方按钮选择：';
+  if (extraNote) text += '\n\n' + extraNote;
+  return { text: text, keyboard: kb(rows) };
+}
 
 /* ============================================================
  * Telegram API Helpers
@@ -1890,22 +1943,15 @@ function startConfirmNo(userId, chatId, user) {
       return (a.checkIn || '').localeCompare(b.checkIn || '');
     });
 
-    var text = '<b>✅ 填入确认号</b>\n\n';
-    text += '请选择要填入确认号的订房：\n\n';
-
-    var rows = [];
-    for (var i = 0; i < Math.min(bookings.length, 10); i++) {
-      var b = bookings[i];
-      text += (i + 1) + '. <b>' + escapeHtml(b.guestName) + '</b> — ' + b.casino + ' / ' + getRoomLabel(b.roomType) + '\n';
-      text += '   📅 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?') + '\n';
-      rows.push([{ text: (i + 1) + '. ' + b.guestName, callback_data: 'cno:' + b._fbKey }]);
-    }
-
-    rows.push([{ text: '⬅️ 取消', callback_data: 'book_cancel' }]);
-
-    text += '\n点击下方按钮选择：\n\n';
-    text += '💡 <b>批量确认号</b>：直接把公关的统一回复粘贴或转发给 Bot，系统会自动识别多个确认号并匹配。';
-    sendMessage(chatId, text, kb(rows));
+    session.data.cnoBookings = bookings;
+    session.data.cnoPage = 1;
+    var msg = buildBookingListMessage(bookings, 1, {
+      prefix:     'cno:',
+      pagePrefix: 'cno_page:',
+      title:      '<b>✅ 填入确认号</b>\n\n请选择要填入确认号的订房：',
+      extraNote:  '💡 <b>批量确认号</b>：直接把公关的统一回复粘贴或转发给 Bot，系统会自动识别多个确认号并匹配。'
+    });
+    sendMessage(chatId, msg.text, msg.keyboard);
   });
 }
 
@@ -2216,19 +2262,15 @@ function startModify(userId, chatId, user) {
       return (a.checkIn || '').localeCompare(b.checkIn || '');
     });
 
-    var text = '<b>✏️ 修改订房</b>\n\n请选择要修改的订房：\n\n';
-    var rows = [];
-    for (var i = 0; i < Math.min(bookings.length, 10); i++) {
-      var b = bookings[i];
-      var listWsIcon = WORK_STATUS_ICONS[b.workStatus || WORK_STATUS.NOT_STARTED] || '';
-      text += (i + 1) + '. ' + listWsIcon + ' ' + STATUS_ICONS[b.status] + ' <b>' + escapeHtml(b.guestName) + '</b> — ' + b.casino + ' / ' + getRoomLabel(b.roomType) + '\n';
-      text += '   📅 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?') + '\n';
-      rows.push([{ text: (i + 1) + '. ' + b.guestName, callback_data: 'mod:' + b._fbKey }]);
-    }
-    rows.push([{ text: '⬅️ 取消', callback_data: 'book_cancel' }]);
-
-    text += '\n点击下方按钮选择：';
-    sendMessage(chatId, text, kb(rows));
+    session.data.modifyBookings = bookings;
+    session.data.modifyPage = 1;
+    var msg = buildBookingListMessage(bookings, 1, {
+      prefix:     'mod:',
+      pagePrefix: 'mod_page:',
+      title:      '<b>✏️ 修改订房</b>\n\n请选择要修改的订房：',
+      showWork:   true
+    });
+    sendMessage(chatId, msg.text, msg.keyboard);
   });
 }
 
@@ -2448,18 +2490,15 @@ function startCancel(userId, chatId, user) {
       return (a.checkIn || '').localeCompare(b.checkIn || '');
     });
 
-    var text = '<b>❌ 取消订房</b>\n\n请选择要取消的订房：\n\n';
-    var rows = [];
-    for (var i = 0; i < Math.min(bookings.length, 10); i++) {
-      var b = bookings[i];
-      text += (i + 1) + '. ' + STATUS_ICONS[b.status] + ' <b>' + escapeHtml(b.guestName) + '</b> — ' + b.casino + ' / ' + getRoomLabel(b.roomType) + '\n';
-      text += '   📅 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?') + '\n';
-      rows.push([{ text: (i + 1) + '. ' + b.guestName, callback_data: 'cnl:' + b._fbKey }]);
-    }
-    rows.push([{ text: '⬅️ 取消操作', callback_data: 'book_cancel' }]);
-
-    text += '\n点击下方按钮选择：';
-    sendMessage(chatId, text, kb(rows));
+    session.data.cancelBookings = bookings;
+    session.data.cancelPage = 1;
+    var msg = buildBookingListMessage(bookings, 1, {
+      prefix:     'cnl:',
+      pagePrefix: 'cnl_page:',
+      title:      '<b>❌ 取消订房</b>\n\n请选择要取消的订房：',
+      cancelCb:   'book_cancel'
+    });
+    sendMessage(chatId, msg.text, msg.keyboard);
   });
 }
 
@@ -2591,29 +2630,58 @@ function startQuery(userId, chatId, user) {
     text += '✅ 已确认：' + counts.confirmed + '\n';
     text += '🟢 已入住：' + counts['checked-in'] + '\n';
     text += '⚪ 已退房：' + counts['checked-out'] + '\n';
-    text += '❌ 已取消：' + counts.cancelled + '\n\n';
-    text += '<b>最近入住 10 笔（按入住日期排序）：</b>\n\n';
+    text += '❌ 已取消：' + counts.cancelled + '\n';
 
-    for (var j = 0; j < Math.min(bookings.length, 10); j++) {
-      var b = bookings[j];
-      text += STATUS_ICONS[b.status] + ' <b>' + escapeHtml(b.guestName || '-') + '</b>';
-      text += ' — ' + (b.casino || '') + ' / ' + getRoomLabel(b.roomType) + '\n';
-      text += '   📅 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?');
-      text += ' (' + (b.nights || 0) + '晚)\n';
-      if (b.confirmNo) text += '   🔢 确认号：' + escapeHtml(b.confirmNo) + '\n';
-      if (b.agent) text += '   👤 代理：' + escapeHtml(b.agent) + '\n';
-      var qWs = b.workStatus || WORK_STATUS.NOT_STARTED;
-      var qWsIcon = (qWs === WORK_STATUS.WORKING) ? '▶️' : '⏸️';
-      text += '   ' + qWsIcon + ' 开工：' + WORK_STATUS_LABELS[qWs] + '\n';
-      text += '\n';
-    }
-
-    if (bookings.length > 10) {
-      text += '... 还有 ' + (bookings.length - 10) + ' 笔记录。';
-    }
-
-    sendMessage(chatId, text, mainMenuKB(emp));
+    var session = createSession(userId, chatId);
+    session.data.queryBookings = bookings;
+    session.data.queryPage = 1;
+    var msg = buildQueryListMessage(bookings, 1, text);
+    sendMessage(chatId, msg.text, msg.keyboard);
   });
+}
+
+function buildQueryListMessage(bookings, page, summaryText) {
+  var total = bookings.length;
+  var totalPages = Math.max(1, Math.ceil(total / BOOKINGS_PER_PAGE));
+  if (page < 1) page = 1;
+  if (page > totalPages) page = totalPages;
+
+  var start = (page - 1) * BOOKINGS_PER_PAGE;
+  var end   = Math.min(start + BOOKINGS_PER_PAGE, total);
+
+  var text = '';
+  if (page === 1) {
+    text += summaryText + '\n';
+  }
+  text += '<b>订房列表（第 ' + page + '/' + totalPages + ' 页，共 ' + total + ' 笔）：</b>\n\n';
+
+  var rows = [];
+  for (var j = start; j < end; j++) {
+    var b = bookings[j];
+    text += STATUS_ICONS[b.status] + ' <b>' + escapeHtml(b.guestName || '-') + '</b>';
+    text += ' — ' + (b.casino || '') + ' / ' + getRoomLabel(b.roomType) + '\n';
+    text += '   📅 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?');
+    text += ' (' + (b.nights || 0) + '晚)\n';
+    if (b.confirmNo) text += '   🔢 确认号：' + escapeHtml(b.confirmNo) + '\n';
+    if (b.agent) text += '   👤 代理：' + escapeHtml(b.agent) + '\n';
+    var qWs = b.workStatus || WORK_STATUS.NOT_STARTED;
+    var qWsIcon = (qWs === WORK_STATUS.WORKING) ? '▶️' : '⏸️';
+    text += '   ' + qWsIcon + ' 开工：' + WORK_STATUS_LABELS[qWs] + '\n';
+    text += '\n';
+  }
+
+  var navRow = [];
+  if (page > 1) {
+    navRow.push({ text: '⬅️ 上一页', callback_data: 'qry_page:' + (page - 1) });
+  }
+  if (page < totalPages) {
+    navRow.push({ text: '下一页 ➡️', callback_data: 'qry_page:' + (page + 1) });
+  }
+  if (navRow.length > 0) rows.push(navRow);
+
+  rows.push([{ text: '⬅️ 返回主菜单', callback_data: 'book_cancel' }]);
+
+  return { text: text, keyboard: kb(rows) };
 }
 
 /* ============================================================
@@ -2789,6 +2857,54 @@ function handleCallback(cb) {
 
     /* Booking flow callbacks */
     var session = getSession(userId);
+
+    /* Pagination for modify / cancel / confirmNo / query lists */
+    if (data.indexOf('mod_page:') === 0) {
+      var pg = parseInt(data.substring(9), 10) || 1;
+      if (session && session.data.modifyBookings) {
+        session.data.modifyPage = pg;
+        var m = buildBookingListMessage(session.data.modifyBookings, pg, {
+          prefix: 'mod:', pagePrefix: 'mod_page:',
+          title: '<b>✏️ 修改订房</b>\n\n请选择要修改的订房：', showWork: true
+        });
+        sendMessage(chatId, m.text, m.keyboard);
+      }
+      return;
+    }
+    if (data.indexOf('cnl_page:') === 0) {
+      var pg2 = parseInt(data.substring(9), 10) || 1;
+      if (session && session.data.cancelBookings) {
+        session.data.cancelPage = pg2;
+        var m2 = buildBookingListMessage(session.data.cancelBookings, pg2, {
+          prefix: 'cnl:', pagePrefix: 'cnl_page:',
+          title: '<b>❌ 取消订房</b>\n\n请选择要取消的订房：'
+        });
+        sendMessage(chatId, m2.text, m2.keyboard);
+      }
+      return;
+    }
+    if (data.indexOf('cno_page:') === 0) {
+      var pg3 = parseInt(data.substring(9), 10) || 1;
+      if (session && session.data.cnoBookings) {
+        session.data.cnoPage = pg3;
+        var m3 = buildBookingListMessage(session.data.cnoBookings, pg3, {
+          prefix: 'cno:', pagePrefix: 'cno_page:',
+          title: '<b>✅ 填入确认号</b>\n\n请选择要填入确认号的订房：',
+          extraNote: '💡 <b>批量确认号</b>：直接把公关的统一回复粘贴或转发给 Bot，系统会自动识别多个确认号并匹配。'
+        });
+        sendMessage(chatId, m3.text, m3.keyboard);
+      }
+      return;
+    }
+    if (data.indexOf('qry_page:') === 0) {
+      var pg4 = parseInt(data.substring(9), 10) || 1;
+      if (session && session.data.queryBookings) {
+        session.data.queryPage = pg4;
+        var m4 = buildQueryListMessage(session.data.queryBookings, pg4, '');
+        sendMessage(chatId, m4.text, m4.keyboard);
+      }
+      return;
+    }
 
     /* Casino selection */
     if (data.indexOf('casino:') === 0) {
