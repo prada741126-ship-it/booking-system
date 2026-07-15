@@ -126,6 +126,7 @@ var OverviewPage = (function () {
       html += '<th style="text-align:center;">入住天數</th>';
       html += Paginator.renderTH('代理', 'agent', _sortField, _sortAsc, 'OverviewPage.sortByCol');
       html += '<th>費用</th><th>狀態</th>';
+      html += '<th style="text-align:center;">開工</th>';
       html += Paginator.renderTH('創建日期', '_createdAt', _sortField, _sortAsc, 'OverviewPage.sortByCol');
       html += '<th>登錄人</th>';
       html += '</tr></thead><tbody>';
@@ -289,6 +290,7 @@ var OverviewPage = (function () {
     html += '<td>' + Utils.escapeHtml(b.agent || '-') + '</td>';
     html += '<td><span class="fee-badge ' + (b.feeStatus || 'free') + '">' + (FEE_TYPE_LABELS[b.feeStatus] || '免費') + '</span></td>';
     html += '<td>' + _statusBadge(b.status) + '</td>';
+    html += '<td style="text-align:center;">' + _workStatusIcon(b.workStatus || WORK_STATUS.NOT_STARTED) + '</td>';
     html += '<td style="font-size:var(--fs-sm);white-space:nowrap;">' + _fmtTimestamp(b._createdAt) + '</td>';
     html += '<td style="font-size:var(--fs-sm);">' + Utils.escapeHtml(b.createdBy || b.employee || '-') + '</td>';
     html += '</tr>';
@@ -305,6 +307,26 @@ var OverviewPage = (function () {
 
   function _statusBadge(status) {
     return '<span class="status-badge status-' + status + '">' + Utils.escapeHtml(BOOKING_STATUS_LABELS[status] || status) + '</span>';
+  }
+
+  /* Work status icon — circular badge with SVG, tooltip on hover */
+  function _workStatusIcon(workStatus) {
+    var ws = workStatus || WORK_STATUS.NOT_STARTED;
+    var label = WORK_STATUS_LABELS[ws] || WORK_STATUS_LABELS[WORK_STATUS.NOT_STARTED];
+
+    if (ws === WORK_STATUS.WORKING) {
+      /* Green circle with play icon */
+      return '<span title="' + Utils.escapeHtml(label) + '" style="display:inline-flex;align-items:center;justify-content:center;' +
+             'width:26px;height:26px;border-radius:50%;background:#16a34a;color:#fff;' +
+             'box-shadow:0 1px 3px rgba(22,163,74,0.3);">' +
+             '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>';
+    } else {
+      /* Gray circle with pause icon */
+      return '<span title="' + Utils.escapeHtml(label) + '" style="display:inline-flex;align-items:center;justify-content:center;' +
+             'width:26px;height:26px;border-radius:50%;background:#e2e8f0;color:#94a3b8;' +
+             'box-shadow:0 1px 2px rgba(0,0,0,0.05);">' +
+             '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg></span>';
+    }
   }
 
   function _emptyStateMini(text) {

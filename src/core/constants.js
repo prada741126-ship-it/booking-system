@@ -93,6 +93,7 @@ var EVENTS = {
   BOOKING_UPDATED:    'booking:updated',
   BOOKING_DELETED:    'booking:deleted',
   BOOKING_STATUS_CHANGED: 'booking:status_changed',
+  BOOKING_WORK_CHANGED:   'booking:work_changed',
   BOOKING_ARCHIVED:   'booking:archived',
   BOOKINGS_LOADED:    'bookings:loaded',
   BOOKINGS_SYNCED:    'bookings:synced',
@@ -289,6 +290,22 @@ var FEE_TYPE_LABELS = {
   paid: '收費'
 };
 
+/* ===== Work Status (開工) ===== */
+var WORK_STATUS = {
+  NOT_STARTED: 'not-started',  /* 未開工 */
+  WORKING:      'working'      /* 開工中 */
+};
+
+var WORK_STATUS_LABELS = {
+  'not-started': '未開工',
+  'working':      '開工中'
+};
+
+var WORK_STATUS_COLORS = {
+  'not-started': UI_COLORS.textMuted,   /* slate-400 — gray */
+  'working':      UI_COLORS.success      /* green-600 — vivid green */
+};
+
 /* ===== Smoking Options ===== */
 var SMOKING_OPTIONS = [
   { value: 'smoking',        label: '吸菸' },
@@ -344,6 +361,7 @@ var BOT_COMMANDS = [
   { command: 'confirmno',  label: '/確認號',   desc: '填入確認編號',      adminOnly: false },
   { command: 'modify',     label: '/修改',     desc: '修改訂房資料',      adminOnly: false },
   { command: 'cancel',     label: '/取消',     desc: '取消訂房',          adminOnly: false },
+  { command: 'work',       label: '/開工',     desc: '標記客人開工狀態',   adminOnly: false },
   { command: 'query',      label: '/查詢',     desc: '查詢訂房記錄',      adminOnly: false }
 ];
 
@@ -390,6 +408,7 @@ var TERMS = {
   pickupName:  '舉牌名稱',
   transfer:    '接送安排',
   remark:      '備註',
+  workStatus:  '開工狀態',
   archived:    '已歸檔',
   threshold:   '洗碼門檻',
   defaultPrice:'預設房價'

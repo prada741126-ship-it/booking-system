@@ -111,6 +111,21 @@ var STATUS_RULES = {
   cancelled:     { canEdit: false, canCancel: false, canEditDates: false }
 };
 
+var WORK_STATUS = {
+  NOT_STARTED: 'not-started',
+  WORKING:      'working'
+};
+
+var WORK_STATUS_LABELS = {
+  'not-started': '未开工',
+  'working':      '开工中'
+};
+
+var WORK_STATUS_ICONS = {
+  'not-started': '⏸️',
+  'working':      '▶️'
+};
+
 var STATUS_AUTO_TRANSITION = {
   toCheckedIn:  ['pending', 'confirmed'],
   toCheckedOut: ['checked-in'],
@@ -208,6 +223,7 @@ function setBotCommands() {
     { command: 'confirmno', description: '填入确认编号（支持批量粘贴）' },
     { command: 'modify',    description: '修改订房资料' },
     { command: 'cancel',    description: '取消订房' },
+    { command: 'work',      description: '标记客人开工状态' },
     { command: 'query',     description: '查询订房记录' }
   ];
   tgRequest('setMyCommands', { commands: commands }, function (err) {
@@ -1228,6 +1244,7 @@ var STEPS = {
   MODIFY_INPUT:      'modify_input',
   CANCEL_SELECT:     'cancel_select',
   CANCEL_CONFIRM:    'cancel_confirm',
+  WORK_SELECT:       'work_select',
   AUTH_TGID:         'auth_tgid',
   AUTH_NAME:         'auth_name',
   AUTH_ROLE:         'auth_role'
@@ -1373,7 +1390,8 @@ function mainMenuKB(emp) {
     [
       { text: '✏️ 修改', callback_data: 'cmd_modify' },
       { text: '❌ 取消', callback_data: 'cmd_cancel' }
-    ]
+    ],
+    [{ text: '▶️ 开工标记', callback_data: 'cmd_work' }]
   ];
   if (emp && emp.role === EMPLOYEE_ROLES.ADMIN) {
     rows.push([{ text: '🔑 新增授权 [管理员]', callback_data: 'cmd_newauth' }]);
@@ -1390,6 +1408,7 @@ function handleHelp(msg) {
   text += '  💡 批量确认号：直接把公关的统一回复粘贴/转发给 Bot，会自动识别并匹配\n';
   text += '✏️ <b>/修改</b> — 修改订房资料（日期/备注等）\n';
   text += '❌ <b>/取消</b> — 取消订房\n';
+  text += '▶️ <b>/开工</b> — 标记客人开工状态\n';
   text += '📋 <b>/查询</b> — 查询订房记录\n';
   text += '🔑 <b>/新增授权</b> — 管理员授权新员工 [管理员]\n\n';
   text += '<b>订房流程：</b>\n';
@@ -1723,6 +1742,8 @@ function submitBooking(chatId, userId, session, user) {
 
     status:        BOOKING_STATUS.PENDING,
     confirmNo:     '',
+
+    workStatus:    WORK_STATUS.NOT_STARTED,
 
     smoking:       d.smoking || 'unspecified',
 
@@ -2467,6 +2488,113 @@ function executeCancel(chatId, userId, fbKey) {
 }
 
 /* ============================================================
+ * /开工 — Toggle Work Status Flow
+ * ============================================================ */
+
+function startWork(userId, chatId, user) {
+  var session = createSession(userId, chatId);
+  session.step = STEPS.WORK_SELECT;
+
+  sendMessage(chatId, '⏳ 正在查询订房记录...');
+
+  fbGet(CONFIG.FIREBASE.PATHS.BOOKINGS, function (err, data) {
+    if (err || !data) {
+      sendMessage(chatId, '查询失败或暂无订房记录。', mainMenuKB(getEmployeeByTgId(user.id)));
+      clearSession(userId);
+      return;
+    }
+
+    var emp = getEmployeeByTgId(user.id);
+    var empId = emp ? emp.id : '';
+    var bookings = [];
+
+    for (var key in data) {
+      if (data.hasOwnProperty(key)) {
+        var b = data[key];
+        if (!b._deleted && !b.archived && b.status !== BOOKING_STATUS.CANCELLED) {
+          /* Show all non-archived, non-cancelled bookings */
+          if (emp && emp.role === EMPLOYEE_ROLES.ADMIN) {
+            bookings.push(b);
+          } else if (b.employeeId === empId) {
+            bookings.push(b);
+          }
+        }
+      }
+    }
+
+    if (bookings.length === 0) {
+      sendMessage(chatId, '暂无可标记的订房记录。', mainMenuKB(emp));
+      clearSession(userId);
+      return;
+    }
+
+    bookings.sort(function (a, b) {
+      return (b.checkIn || '').localeCompare(a.checkIn || '');
+    });
+
+    var text = '<b>▶️ 开工标记</b>\n\n请选择要标记的订房：\n\n';
+    var rows = [];
+    for (var i = 0; i < Math.min(bookings.length, 10); i++) {
+      var b = bookings[i];
+      var wsIcon = (b.workStatus === WORK_STATUS.WORKING) ? '▶️' : '⏸️';
+      var wsLabel = WORK_STATUS_LABELS[b.workStatus || WORK_STATUS.NOT_STARTED];
+      text += (i + 1) + '. ' + wsIcon + ' ' + STATUS_ICONS[b.status] + ' <b>' + escapeHtml(b.guestName) + '</b> — ' + b.casino + '\n';
+      text += '   📅 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?') + ' | ' + wsLabel + '\n';
+      rows.push([{ text: (i + 1) + '. ' + wsIcon + ' ' + b.guestName + ' [' + wsLabel + ']', callback_data: 'work:' + b._fbKey }]);
+    }
+    rows.push([{ text: '⬅️ 取消操作', callback_data: 'book_cancel' }]);
+
+    text += '\n点击下方按钮切换开工状态：';
+    sendMessage(chatId, text, kb(rows));
+  });
+}
+
+function toggleWorkStatus(chatId, userId, fbKey) {
+  fbGet(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), function (err, booking) {
+    if (err || !booking) {
+      sendMessage(chatId, '❌ 找不到该订房记录。', mainMenuKB(getEmployeeByTgId(userId)));
+      clearSession(userId);
+      return;
+    }
+
+    var current = booking.workStatus || WORK_STATUS.NOT_STARTED;
+    var next = (current === WORK_STATUS.WORKING) ? WORK_STATUS.NOT_STARTED : WORK_STATUS.WORKING;
+
+    booking.workStatus = next;
+    booking._updatedAt = Date.now();
+
+    writeBooking(booking, function (err2) {
+      if (err2) {
+        sendMessage(chatId, '❌ 更新失败，请稍后重试。', mainMenuKB(getEmployeeByTgId(userId)));
+        return;
+      }
+
+      /* Write bot log */
+      writeBotLog({
+        _fbKey:   generateFbKey(),
+        timestamp: Date.now(),
+        employee:  booking.employee || '',
+        employeeId: booking.employeeId || '',
+        action:    'work_status_toggle',
+        message:   '开工标记切换：' + booking.guestName + ' → ' + WORK_STATUS_LABELS[next],
+        bookingKey: fbKey,
+        userId:    userId
+      });
+
+      var nextIcon = (next === WORK_STATUS.WORKING) ? '▶️' : '⏸️';
+      var text = '✅ <b>开工状态已更新</b>\n\n';
+      text += '👤 客人：' + escapeHtml(booking.guestName) + '\n';
+      text += '🏨 ' + booking.casino + ' / ' + booking.hotel + '\n';
+      text += '📅 ' + booking.checkIn + ' ~ ' + booking.checkOut + '\n';
+      text += nextIcon + ' 开工状态：<b>' + WORK_STATUS_LABELS[next] + '</b>';
+
+      sendMessage(chatId, text, mainMenuKB(getEmployeeByTgId(userId)));
+      clearSession(userId);
+    });
+  });
+}
+
+/* ============================================================
  * /查询 — Query Bookings
  * ============================================================ */
 
@@ -2532,6 +2660,9 @@ function startQuery(userId, chatId, user) {
       text += ' (' + (b.nights || 0) + '晚)\n';
       if (b.confirmNo) text += '   🔢 确认号：' + escapeHtml(b.confirmNo) + '\n';
       if (b.agent) text += '   👤 代理：' + escapeHtml(b.agent) + '\n';
+      var qWs = b.workStatus || WORK_STATUS.NOT_STARTED;
+      var qWsIcon = (qWs === WORK_STATUS.WORKING) ? '▶️' : '⏸️';
+      text += '   ' + qWsIcon + ' 开工：' + WORK_STATUS_LABELS[qWs] + '\n';
       text += '\n';
     }
 
@@ -2711,6 +2842,7 @@ function handleCallback(cb) {
     if (data === 'cmd_modify') { startModify(userId, chatId, user); return; }
     if (data === 'cmd_cancel') { startCancel(userId, chatId, user); return; }
     if (data === 'cmd_query') { startQuery(userId, chatId, user); return; }
+    if (data === 'cmd_work') { startWork(userId, chatId, user); return; }
     if (data === 'cmd_today_checkin') { startTodayCheckIn(userId, chatId, user); return; }
     if (data === 'cmd_newauth') { startNewAuth(userId, chatId, user); return; }
 
@@ -2936,6 +3068,13 @@ function handleCallback(cb) {
       return;
     }
 
+    /* Work status toggle flow */
+    if (data.indexOf('work:') === 0) {
+      var workKey = data.substring(5);
+      toggleWorkStatus(chatId, userId, workKey);
+      return;
+    }
+
     /* Auth role selection */
     if (data.indexOf('authrole:') === 0) {
       var role = data.substring(9);
@@ -3032,6 +3171,13 @@ function handleText(msg) {
   if (cmd === '/取消' || cmd === '/cancel') {
     checkAuth(msg, function (ok) {
       if (ok) startCancel(userId, chatId, msg.from);
+    });
+    return;
+  }
+
+  if (cmd === '/开工' || cmd === '/work' || cmd === '/開工') {
+    checkAuth(msg, function (ok) {
+      if (ok) startWork(userId, chatId, msg.from);
     });
     return;
   }
@@ -3580,6 +3726,9 @@ function startTodayCheckIn(userId, chatId, user) {
       if (b.smoking === 'smoking') text += '   🚬 吸烟房\n';
       if (b.pickupName) text += '   🪧 举牌：' + escapeHtml(b.pickupName) + '\n';
       if (b.remark) text += '   📝 备注：' + escapeHtml(b.remark) + '\n';
+      var tWs = b.workStatus || WORK_STATUS.NOT_STARTED;
+      var tWsIcon = (tWs === WORK_STATUS.WORKING) ? '▶️' : '⏸️';
+      text += '   ' + tWsIcon + ' 开工：' + WORK_STATUS_LABELS[tWs] + '\n';
       text += '\n';
     }
 

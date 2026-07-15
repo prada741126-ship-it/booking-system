@@ -49,6 +49,9 @@ var Bookings = {
       status:       data.status || BOOKING_STATUS.PENDING,
       confirmNo:    data.confirmNo || '',
 
+      /* Work status (開工) */
+      workStatus:   data.workStatus || WORK_STATUS.NOT_STARTED,
+
       /* Smoking */
       smoking:      data.smoking || 'unspecified',
 
@@ -210,6 +213,37 @@ var Bookings = {
     if (updated && data.status) {
       Events.emit(EVENTS.BOOKING_STATUS_CHANGED, { fbKey: fbKey, status: data.status, confirmNo: confirmNo });
     }
+    return updated;
+  },
+
+  /**
+   * Toggle work status (開工/未開工)
+   * Independent of STATUS_RULES — can toggle even if booking is locked
+   * @param {string} fbKey - booking key
+   * @returns {Object|null} updated booking or null
+   */
+  setWorkStatus: function (fbKey, status) {
+    var updated = null;
+
+    State.update('bookings', function (list) {
+      for (var i = 0; i < list.length; i++) {
+        if (list[i]._fbKey === fbKey) {
+          list[i].workStatus = status;
+          list[i]._updatedAt = Date.now();
+          updated = list[i];
+          break;
+        }
+      }
+      return list;
+    });
+
+    if (updated) {
+      Store.saveBookings(State.get('bookings'));
+      syncBookingToFirebase(updated);
+      Events.emit(EVENTS.BOOKING_WORK_CHANGED, { fbKey: fbKey, workStatus: status });
+      console.log('[Bookings] Work status set:', fbKey, status);
+    }
+
     return updated;
   },
 
