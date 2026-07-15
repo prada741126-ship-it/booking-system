@@ -223,7 +223,6 @@ function setBotCommands() {
     { command: 'confirmno', description: '填入确认编号（支持批量粘贴）' },
     { command: 'modify',    description: '修改订房资料' },
     { command: 'cancel',    description: '取消订房' },
-    { command: 'work',      description: '标记客人开工状态' },
     { command: 'query',     description: '查询订房记录' }
   ];
   tgRequest('setMyCommands', { commands: commands }, function (err) {
@@ -1247,6 +1246,7 @@ var STEPS = {
   BOOKING_SMOKING:   'booking_smoking',
   BOOKING_REMARK:    'booking_remark',
   BOOKING_FEE_TYPE:  'booking_fee_type',
+  BOOKING_WORK:      'booking_work',
   BOOKING_PICKUP:    'booking_pickup',
   BOOKING_CONFIRM:   'booking_confirm',
   CONFIRMNO_SELECT:  'confirmno_select',
@@ -1257,7 +1257,6 @@ var STEPS = {
   MODIFY_INPUT:      'modify_input',
   CANCEL_SELECT:     'cancel_select',
   CANCEL_CONFIRM:    'cancel_confirm',
-  WORK_SELECT:       'work_select',
   AUTH_TGID:         'auth_tgid',
   AUTH_NAME:         'auth_name',
   AUTH_ROLE:         'auth_role'
@@ -1403,8 +1402,7 @@ function mainMenuKB(emp) {
     [
       { text: '✏️ 修改', callback_data: 'cmd_modify' },
       { text: '❌ 取消', callback_data: 'cmd_cancel' }
-    ],
-    [{ text: '▶️ 开工标记', callback_data: 'cmd_work' }]
+    ]
   ];
   if (emp && emp.role === EMPLOYEE_ROLES.ADMIN) {
     rows.push([{ text: '🔑 新增授权 [管理员]', callback_data: 'cmd_newauth' }]);
@@ -1421,14 +1419,14 @@ function handleHelp(msg) {
   text += '  💡 批量确认号：直接把公关的统一回复粘贴/转发给 Bot，会自动识别并匹配\n';
   text += '✏️ <b>/修改</b> — 修改订房资料（日期/备注等）\n';
   text += '❌ <b>/取消</b> — 取消订房\n';
-  text += '▶️ <b>/开工</b> — 标记客人开工状态\n';
   text += '📋 <b>/查询</b> — 查询订房记录\n';
   text += '🔑 <b>/新增授权</b> — 管理员授权新员工 [管理员]\n\n';
   text += '<b>订房流程：</b>\n';
   text += '1. 贴上订房文字（姓名/入住/退房/备注）\n';
   text += '2. 按钮选择酒店体系 → 酒店 → 房型\n';
   text += '3. 按钮选择所属代理\n';
-  text += '4. 确认送出\n\n';
+  text += '4. 选择吸烟偏好 → 费用类型 → 是否开工\n';
+  text += '5. 确认送出\n\n';
   text += '<b>批量确认号：</b>\n';
   text += '公关统一回复多个确认号时，直接把消息转发或粘贴给 Bot，系统会自动按姓名匹配并填入。\n\n';
   text += '系统会自动同步到管理后台。';
@@ -1670,6 +1668,21 @@ function proceedAfterAgent(chatId, session) {
     );
     return;
   }
+  /* Work status selection — is this group working? */
+  if (!d.workStatus) {
+    session.step = STEPS.BOOKING_WORK;
+    sendMessage(chatId,
+      '请选择<b>客人是否开工</b>：',
+      kb([
+        [
+          { text: '▶️ 开工中', callback_data: 'book_work:working' },
+          { text: '⏸️ 未开工', callback_data: 'book_work:not-started' }
+        ],
+        [{ text: '⬅️ 返回', callback_data: 'book_back_fee' }]
+      ])
+    );
+    return;
+  }
   /* All info complete → show confirmation summary */
   showBookingConfirm(chatId, session);
 }
@@ -1698,6 +1711,9 @@ function showBookingConfirm(chatId, session) {
   text += '👤 代理：' + (d.agent || '-') + '\n';
   text += '💰 洗码门槛：' + formatNum(Math.round((d.threshold || 0) / 10000)) + '万\n';
   text += '💵 费用类型：' + (d.feeStatus === 'paid' ? '收费订房' : '免费订房') + '\n';
+  var wsLabel = WORK_STATUS_LABELS[d.workStatus] || WORK_STATUS_LABELS[WORK_STATUS.NOT_STARTED];
+  var wsIcon = WORK_STATUS_ICONS[d.workStatus] || WORK_STATUS_ICONS[WORK_STATUS.NOT_STARTED];
+  text += wsIcon + ' 开工状态：<b>' + wsLabel + '</b>\n';
   text += '📝 备注：' + (d.remark || '-') + '\n';
   text += '👤 登记员工：' + escapeHtml(d.employee || '-') + '\n';
   text += '\n确认以上资料是否正确？';
@@ -1756,7 +1772,7 @@ function submitBooking(chatId, userId, session, user) {
     status:        BOOKING_STATUS.PENDING,
     confirmNo:     '',
 
-    workStatus:    WORK_STATUS.NOT_STARTED,
+    workStatus:    d.workStatus || WORK_STATUS.NOT_STARTED,
 
     smoking:       d.smoking || 'unspecified',
 
@@ -1812,6 +1828,9 @@ function submitBooking(chatId, userId, session, user) {
     text += '📅 ' + booking.checkIn + ' ~ ' + booking.checkOut + '（' + booking.nights + ' 晚）\n';
     text += '💰 洗码门槛：' + formatNum(Math.round((booking.threshold || 0) / 10000)) + '万\n';
     text += '💵 费用类型：' + (booking.feeStatus === 'paid' ? '收费订房' : '免费订房') + '\n';
+    var bWsIcon = WORK_STATUS_ICONS[booking.workStatus] || WORK_STATUS_ICONS[WORK_STATUS.NOT_STARTED];
+    var bWsLabel = WORK_STATUS_LABELS[booking.workStatus] || WORK_STATUS_LABELS[WORK_STATUS.NOT_STARTED];
+    text += bWsIcon + ' 开工：' + bWsLabel + '\n';
     text += '\n⏳ 状态：<b>待确认</b>\n';
     text += '收到公关确认号后，请使用 /确认号 填入。\n';
     text += '💡 如公关一次回复多个确认号，直接把消息粘贴或转发给 Bot 即可自动识别。';
@@ -2199,7 +2218,8 @@ function startModify(userId, chatId, user) {
     var rows = [];
     for (var i = 0; i < Math.min(bookings.length, 10); i++) {
       var b = bookings[i];
-      text += (i + 1) + '. ' + STATUS_ICONS[b.status] + ' <b>' + escapeHtml(b.guestName) + '</b> — ' + b.casino + ' / ' + getRoomLabel(b.roomType) + '\n';
+      var listWsIcon = WORK_STATUS_ICONS[b.workStatus || WORK_STATUS.NOT_STARTED] || '';
+      text += (i + 1) + '. ' + listWsIcon + ' ' + STATUS_ICONS[b.status] + ' <b>' + escapeHtml(b.guestName) + '</b> — ' + b.casino + ' / ' + getRoomLabel(b.roomType) + '\n';
       text += '   📅 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?') + '\n';
       rows.push([{ text: (i + 1) + '. ' + b.guestName, callback_data: 'mod:' + b._fbKey }]);
     }
@@ -2228,7 +2248,10 @@ function showModifyOptions(chatId, userId, fbKey) {
     text += '🚬 吸烟：' + (booking.smoking === 'smoking' ? '吸烟' : booking.smoking === 'non-smoking' ? '禁烟' : '未指定') + '\n';
     text += '🪧 举牌：' + (booking.pickupName || '-') + '\n';
     text += '📝 备注：' + (booking.remark || '-') + '\n';
-    text += '📊 状态：' + STATUS_LABELS[booking.status] + '\n\n';
+    text += '📊 状态：' + STATUS_LABELS[booking.status] + '\n';
+    var mWs = booking.workStatus || WORK_STATUS.NOT_STARTED;
+    var mWsIcon = WORK_STATUS_ICONS[mWs] || WORK_STATUS_ICONS[WORK_STATUS.NOT_STARTED];
+    text += mWsIcon + ' 开工：' + WORK_STATUS_LABELS[mWs] + '\n\n';
     text += '请选择要修改的字段：';
 
     rows.push([{ text: '📅 入住日期', callback_data: 'modfield:checkIn' }]);
@@ -2512,117 +2535,6 @@ function executeCancel(chatId, userId, fbKey) {
 }
 
 /* ============================================================
- * /开工 — Toggle Work Status Flow
- * ============================================================ */
-
-function startWork(userId, chatId, user) {
-  var session = createSession(userId, chatId);
-  session.step = STEPS.WORK_SELECT;
-
-  sendMessage(chatId, '⏳ 正在查询订房记录...');
-
-  fbGet(CONFIG.FIREBASE.PATHS.BOOKINGS, function (err, data) {
-    if (err || !data) {
-      sendMessage(chatId, '查询失败或暂无订房记录。', mainMenuKB(getEmployeeByTgId(user.id)));
-      clearSession(userId);
-      return;
-    }
-
-    var emp = getEmployeeByTgId(user.id);
-    var empId = emp ? emp.id : '';
-    var bookings = [];
-
-    for (var key in data) {
-      if (data.hasOwnProperty(key)) {
-        var b = data[key];
-        if (!b._deleted && !b.archived && b.status !== BOOKING_STATUS.CANCELLED) {
-          /* Show all non-archived, non-cancelled bookings */
-          if (emp && emp.role === EMPLOYEE_ROLES.ADMIN) {
-            bookings.push(b);
-          } else if (b.employeeId === empId) {
-            bookings.push(b);
-          }
-        }
-      }
-    }
-
-    if (bookings.length === 0) {
-      sendMessage(chatId, '暂无可标记的订房记录。', mainMenuKB(emp));
-      clearSession(userId);
-      return;
-    }
-
-    bookings.sort(function (a, b) {
-      return (b.checkIn || '').localeCompare(a.checkIn || '');
-    });
-
-    var text = '<b>▶️ 开工标记</b>\n\n请选择要标记的订房：\n\n';
-    var rows = [];
-    for (var i = 0; i < Math.min(bookings.length, 10); i++) {
-      var b = bookings[i];
-      var wsIcon = (b.workStatus === WORK_STATUS.WORKING) ? '▶️' : '⏸️';
-      var wsLabel = WORK_STATUS_LABELS[b.workStatus || WORK_STATUS.NOT_STARTED];
-      text += (i + 1) + '. ' + wsIcon + ' ' + STATUS_ICONS[b.status] + ' <b>' + escapeHtml(b.guestName) + '</b> — ' + b.casino + '\n';
-      text += '   📅 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?') + ' | ' + wsLabel + '\n';
-      rows.push([{ text: (i + 1) + '. ' + wsIcon + ' ' + b.guestName + ' [' + wsLabel + ']', callback_data: 'work:' + b._fbKey }]);
-    }
-    rows.push([{ text: '⬅️ 取消操作', callback_data: 'book_cancel' }]);
-
-    text += '\n点击下方按钮切换开工状态：';
-    sendMessage(chatId, text, kb(rows));
-  });
-}
-
-function toggleWorkStatus(chatId, userId, fbKey) {
-  fbGet(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), function (err, booking) {
-    if (err || !booking) {
-      sendMessage(chatId, '❌ 找不到该订房记录。', mainMenuKB(getEmployeeByTgId(userId)));
-      clearSession(userId);
-      return;
-    }
-
-    var current = booking.workStatus || WORK_STATUS.NOT_STARTED;
-    var next = (current === WORK_STATUS.WORKING) ? WORK_STATUS.NOT_STARTED : WORK_STATUS.WORKING;
-
-    var wsPatch = {
-      workStatus: next,
-      _updatedAt: Date.now()
-    };
-    booking.workStatus = next;
-    booking._updatedAt = wsPatch._updatedAt;
-
-    patchBooking(fbKey, wsPatch, function (err2) {
-      if (err2) {
-        sendMessage(chatId, '❌ 更新失败，请稍后重试。', mainMenuKB(getEmployeeByTgId(userId)));
-        return;
-      }
-
-      /* Write bot log */
-      writeBotLog({
-        _fbKey:   generateFbKey(),
-        timestamp: Date.now(),
-        employee:  booking.employee || '',
-        employeeId: booking.employeeId || '',
-        action:    'work_status_toggle',
-        message:   '开工标记切换：' + booking.guestName + ' → ' + WORK_STATUS_LABELS[next],
-        bookingKey: fbKey,
-        userId:    userId
-      });
-
-      var nextIcon = (next === WORK_STATUS.WORKING) ? '▶️' : '⏸️';
-      var text = '✅ <b>开工状态已更新</b>\n\n';
-      text += '👤 客人：' + escapeHtml(booking.guestName) + '\n';
-      text += '🏨 ' + booking.casino + ' / ' + booking.hotel + '\n';
-      text += '📅 ' + booking.checkIn + ' ~ ' + booking.checkOut + '\n';
-      text += nextIcon + ' 开工状态：<b>' + WORK_STATUS_LABELS[next] + '</b>';
-
-      sendMessage(chatId, text, mainMenuKB(getEmployeeByTgId(userId)));
-      clearSession(userId);
-    });
-  });
-}
-
-/* ============================================================
  * /查询 — Query Bookings
  * ============================================================ */
 
@@ -2870,7 +2782,6 @@ function handleCallback(cb) {
     if (data === 'cmd_modify') { startModify(userId, chatId, user); return; }
     if (data === 'cmd_cancel') { startCancel(userId, chatId, user); return; }
     if (data === 'cmd_query') { startQuery(userId, chatId, user); return; }
-    if (data === 'cmd_work') { startWork(userId, chatId, user); return; }
     if (data === 'cmd_today_checkin') { startTodayCheckIn(userId, chatId, user); return; }
     if (data === 'cmd_newauth') { startNewAuth(userId, chatId, user); return; }
 
@@ -2980,7 +2891,37 @@ function handleCallback(cb) {
       var feeVal = data.substring(9);
       if (session) {
         session.data.feeStatus = feeVal;
+        /* Proceed to work status selection */
+        proceedAfterAgent(chatId, session);
+      }
+      return;
+    }
+
+    /* Work status selection */
+    if (data.indexOf('book_work:') === 0) {
+      var workVal = data.substring(10);
+      if (session) {
+        session.data.workStatus = workVal;
         showBookingConfirm(chatId, session);
+      }
+      return;
+    }
+
+    /* Back to fee type (from work status step) */
+    if (data === 'book_back_fee') {
+      if (session) {
+        session.data.workStatus = null;
+        session.step = STEPS.BOOKING_FEE_TYPE;
+        sendMessage(chatId,
+          '请选择<b>费用类型</b>：',
+          kb([
+            [
+              { text: '🆓 免费订房', callback_data: 'book_fee:free' },
+              { text: '💰 收费订房', callback_data: 'book_fee:paid' }
+            ],
+            [{ text: '⬅️ 返回', callback_data: 'book_back_smoking' }]
+          ])
+        );
       }
       return;
     }
@@ -3096,13 +3037,6 @@ function handleCallback(cb) {
       return;
     }
 
-    /* Work status toggle flow */
-    if (data.indexOf('work:') === 0) {
-      var workKey = data.substring(5);
-      toggleWorkStatus(chatId, userId, workKey);
-      return;
-    }
-
     /* Auth role selection */
     if (data.indexOf('authrole:') === 0) {
       var role = data.substring(9);
@@ -3199,13 +3133,6 @@ function handleText(msg) {
   if (cmd === '/取消' || cmd === '/cancel') {
     checkAuth(msg, function (ok) {
       if (ok) startCancel(userId, chatId, msg.from);
-    });
-    return;
-  }
-
-  if (cmd === '/开工' || cmd === '/work' || cmd === '/開工') {
-    checkAuth(msg, function (ok) {
-      if (ok) startWork(userId, chatId, msg.from);
     });
     return;
   }

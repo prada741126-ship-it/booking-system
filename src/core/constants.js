@@ -361,7 +361,6 @@ var BOT_COMMANDS = [
   { command: 'confirmno',  label: '/確認號',   desc: '填入確認編號',      adminOnly: false },
   { command: 'modify',     label: '/修改',     desc: '修改訂房資料',      adminOnly: false },
   { command: 'cancel',     label: '/取消',     desc: '取消訂房',          adminOnly: false },
-  { command: 'work',       label: '/開工',     desc: '標記客人開工狀態',   adminOnly: false },
   { command: 'query',      label: '/查詢',     desc: '查詢訂房記錄',      adminOnly: false }
 ];
 

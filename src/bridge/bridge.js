@@ -353,15 +353,6 @@ function viewBookingDetail(fbKey) {
 
   body += '</div>';
 
-  /* Work status toggle section — button style, not dropdown */
-  body += '<div style="margin-top:var(--sp-4);padding:var(--sp-3);background:var(--bg-input);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:space-between;">';
-  body += '  <div style="display:flex;align-items:center;gap:var(--sp-2);">';
-  body += '    <span style="font-size:var(--fs-sm);color:var(--text-secondary);font-weight:500;">開工狀態</span>';
-  body += _workStatusBadge(b.workStatus || WORK_STATUS.NOT_STARTED);
-  body += '  </div>';
-  body += _workStatusButton(b._fbKey, b.workStatus || WORK_STATUS.NOT_STARTED);
-  body += '</div>';
-
   if (b.remark) {
     body += '<div class="form-group" style="margin-top:var(--sp-4);"><label>' + Utils.escapeHtml(TERMS.remark) + '</label>';
     body += '<div style="padding:var(--sp-3);background:var(--bg-input);border-radius:var(--radius-md);">' + Utils.escapeHtml(b.remark) + '</div></div>';
@@ -427,67 +418,6 @@ function _transferLabel(val) {
     if (TRANSFER_OPTIONS[i].value === val) return TRANSFER_OPTIONS[i].label;
   }
   return val || '\u7121';
-}
-
-/* ----- work status helpers ----- */
-
-/* SVG icon badge for work status — circle background + icon */
-function _workStatusBadge(workStatus) {
-  var ws = workStatus || WORK_STATUS.NOT_STARTED;
-  var color = WORK_STATUS_COLORS[ws] || UI_COLORS.textMuted;
-  var label = WORK_STATUS_LABELS[ws] || WORK_STATUS_LABELS[WORK_STATUS.NOT_STARTED];
-
-  if (ws === WORK_STATUS.WORKING) {
-    /* Green circle with play icon — 開工中 */
-    return '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:var(--radius-full);' +
-           'background:' + color + '15;color:' + color + ';font-size:var(--fs-xs);font-weight:600;">' +
-           '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>' +
-           Utils.escapeHtml(label) + '</span>';
-  } else {
-    /* Gray circle with pause icon — 未開工 */
-    return '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:var(--radius-full);' +
-           'background:' + color + '15;color:' + color + ';font-size:var(--fs-xs);font-weight:500;">' +
-           '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>' +
-           Utils.escapeHtml(label) + '</span>';
-  }
-}
-
-/* Toggle button — shows the action you can perform */
-function _workStatusButton(fbKey, workStatus) {
-  var ws = workStatus || WORK_STATUS.NOT_STARTED;
-  if (ws === WORK_STATUS.WORKING) {
-    /* Currently working → button to mark as not started */
-    return '<button class="btn btn-secondary btn-sm" onclick="toggleWorkStatus(\'' + fbKey + '\')" ' +
-           'style="display:inline-flex;align-items:center;gap:4px;">' +
-           '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>' +
-           '標記未開工</button>';
-  } else {
-    /* Not started → button to mark as working */
-    return '<button class="btn btn-success btn-sm" onclick="toggleWorkStatus(\'' + fbKey + '\')" ' +
-           'style="display:inline-flex;align-items:center;gap:4px;background:#16a34a;border-color:#16a34a;color:#fff;">' +
-           '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>' +
-           '標記開工</button>';
-  }
-}
-
-/* Global toggle function — flips work status and refreshes modal */
-function toggleWorkStatus(fbKey) {
-  var b = Bookings.getByKey(fbKey);
-  if (!b) { Toast.error('\u627e\u4e0d\u5230\u8a02\u623f\u8a18\u9304'); return; }
-
-  var current = b.workStatus || WORK_STATUS.NOT_STARTED;
-  var next = (current === WORK_STATUS.WORKING) ? WORK_STATUS.NOT_STARTED : WORK_STATUS.WORKING;
-
-  Bookings.setWorkStatus(fbKey, next);
-
-  var label = WORK_STATUS_LABELS[next];
-  Toast.success('\u5df2\u6a19\u8a18\u70ba\u300c' + label + '\u300d');
-
-  /* Re-open detail modal to reflect change */
-  Modal.close();
-  setTimeout(function () { viewBookingDetail(fbKey); }, 100);
-
-  Events.emit(EVENTS.UI_RENDER);
 }
 
 /* ============================================================
