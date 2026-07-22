@@ -146,7 +146,7 @@ var ArchivesPage = (function () {
   function _archiveRow(a) {
     var curr = a.currency || CURRENCY_DEFAULT;
     var html = '<tr>';
-    html += '<td style="font-weight:600;">' + Utils.escapeHtml(a.guestName || '-') + '</td>';
+    html += '<td style="font-weight:600;">' + Utils.escapeHtml(Utils.fixGuestName(a)) + '</td>';
     html += '<td>' + Utils.escapeHtml(a.agent || '-') + '</td>';
     html += '<td>' + Utils.escapeHtml(a.casino || '-') + '</td>';
     html += '<td style="font-size:var(--fs-sm);">' + Utils.formatDateDisplay(a.checkIn) + '</td>';

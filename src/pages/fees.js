@@ -190,7 +190,7 @@ var FeesPage = (function () {
 
     var html = '<tr data-fbkey="' + Utils.escapeHtml(b._fbKey || '') + '">';
     html += '<td style="font-weight:600;">' + Utils.escapeHtml(b.agent || '-') + '</td>';
-    html += '<td>' + Utils.escapeHtml(b.guestName || '-') + '</td>';
+    html += '<td>' + Utils.escapeHtml(Utils.fixGuestName(b)) + '</td>';
     html += '<td style="font-size:var(--fs-sm);">' + Utils.escapeHtml(b.hotel || '-') + '</td>';
     html += '<td style="font-size:var(--fs-sm);">' + Utils.formatDateDisplay(b.checkIn) + '</td>';
     html += '<td class="num-cell cell-nights">' + n + '</td>';

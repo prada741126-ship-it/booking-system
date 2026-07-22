@@ -296,7 +296,7 @@ var AgentPerfPage = (function () {
       var statusLabel = _statusLabel(b.status);
       html += '<tr>';
       html += '<td style="font-weight:600;">' + Utils.escapeHtml(b.agent || '-') + '</td>';
-      html += '<td>' + Utils.escapeHtml(b.guestName || '-') + '</td>';
+      html += '<td>' + Utils.escapeHtml(Utils.fixGuestName(b)) + '</td>';
       html += '<td>' + Utils.escapeHtml(b.hotel || '-') + '</td>';
       html += '<td>' + Utils.escapeHtml((b.checkIn || '').slice(0, 10)) + '</td>';
       html += '<td style="text-align:center;">' + n + '</td>';

@@ -365,6 +365,18 @@ var Utils = (function () {
       .replace(/'/g, '&#039;');
   }
 
+  /* ===== Fix guestName display (v2.2.3) ===== */
+  function fixGuestName(b) {
+    var name = (b && b.guestName) || '-';
+    /* If guestName embeds a date range like "洪秉豐 07/20-07/22 映星匯雙床（禁）",
+       replace it with actual checkIn/checkOut dates */
+    if (/\s+\d{2}\/\d{2}-\d{2}\/\d{2}\b/.test(name)) {
+      var actualRange = formatDateDisplay(b.checkIn) + '-' + formatDateDisplay(b.checkOut);
+      name = name.replace(/\s+\d{2}\/\d{2}-\d{2}\/\d{2}\b/, ' ' + actualRange);
+    }
+    return name;
+  }
+
   /* ===== Debounce ===== */
   function debounce(fn, wait) {
     var timer = null;
@@ -448,6 +460,7 @@ var Utils = (function () {
     el: el,
     clearNode: clearNode,
     escapeHtml: escapeHtml,
+    fixGuestName: fixGuestName,
     debounce: debounce,
     fbObjToArray: fbObjToArray,
     encodeFirebaseKey: encodeFirebaseKey,
