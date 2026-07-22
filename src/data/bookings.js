@@ -121,6 +121,11 @@ var Bookings = {
             return list;
           }
 
+          /* Capture old values BEFORE mutation (for debug logging) */
+          var oldCheckIn = booking.checkIn;
+          var oldCheckOut = booking.checkOut;
+          var oldNights = booking.nights;
+
           /* Merge data into existing */
           for (var key in data) {
             if (data.hasOwnProperty(key) && key.charAt(0) !== '_') {
@@ -134,9 +139,6 @@ var Bookings = {
           }
 
           /* Recalculate derived fields */
-          var oldCheckIn = booking.checkIn;
-          var oldCheckOut = booking.checkOut;
-          var oldNights = booking.nights;
           booking.nights = Utils.calcNights(booking.checkIn, booking.checkOut);
           booking.month = Utils.getMonthStr(booking.checkIn) || booking.month;
           booking.profit = Bookings.calcProfit(booking);

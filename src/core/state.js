@@ -44,6 +44,10 @@ var State = (function () {
     var current = _state[key];
     var updated = typeof updater === 'function' ? updater(current) : updater;
     set(key, updated);
+    /* Always emit UI_RENDER after update — even if the reference is unchanged
+       (e.g., array mutated in-place), the data may have changed. This is critical
+       for booking edits where the updater modifies array items in-place. */
+    Events.emit(EVENTS.UI_RENDER, { key: key });
   }
 
   /* Convenience getters */
