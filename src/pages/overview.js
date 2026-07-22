@@ -280,6 +280,15 @@ var OverviewPage = (function () {
   }
 
   function _recentRow(b) {
+    /* DEBUG: Log rendered booking */
+    console.log('[Overview._recentRow]', b.guestName,
+      '| checkIn:', b.checkIn,
+      '| checkOut:', b.checkOut,
+      '| nights:', b.nights,
+      '| _fbKey:', b._fbKey,
+      '| _updatedAt:', b._updatedAt,
+      '| status:', b.status);
+
     var html = '<tr style="cursor:pointer;" onclick="viewBookingDetail(\'' + b._fbKey + '\')">';
     html += '<td style="font-weight:600;">' + Utils.escapeHtml(b.guestName || '-') + '</td>';
     html += '<td>' + Utils.escapeHtml(b.casino || '-') + '</td>';

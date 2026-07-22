@@ -36,6 +36,15 @@ function _watchBookings() {
       var alive = Merger.filterAlive(merged);
       var changed = _hasChanged(local, alive);
       if (changed) {
+        /* DEBUG: Log watcher overwrite details */
+        console.log('[Watchers._watchBookings] State overwrite — local:', (local||[]).length, 'items, remote:', (remote||[]).length, 'items, merged alive:', alive.length, 'items');
+        /* Log specific booking details for known test cases */
+        for (var di = 0; di < alive.length; di++) {
+          var db = alive[di];
+          if (db.guestName && (db.guestName.indexOf('林') !== -1 || db.guestName.indexOf('洪') !== -1)) {
+            console.log('[Watchers._watchBookings] After merge:', db.guestName, '| checkIn:', db.checkIn, '| checkOut:', db.checkOut, '| nights:', db.nights, '| _updatedAt:', db._updatedAt);
+          }
+        }
         State.set('bookings', alive);
         Store.saveBookings(alive);
         Events.emit(EVENTS.BOOKINGS_SYNCED, alive);

@@ -266,6 +266,12 @@ function saveBookingForm() {
   }
 
   if (_editingBookingKey) {
+    /* DEBUG: Log save data */
+    console.log('[saveBookingForm] Updating', _editingBookingKey,
+      '| checkIn:', data.checkIn,
+      '| checkOut:', data.checkOut,
+      '| guestName:', data.guestName);
+
     Bookings.update(_editingBookingKey, data);
     Toast.success('\u8a02\u623f\u5df2\u66f4\u65b0');
   } else {
@@ -294,8 +300,8 @@ function editBooking(fbKey) {
     return;
   }
 
-  _editingBookingKey = fbKey;
   openBookingModal();
+  _editingBookingKey = fbKey;  /* MUST be after openBookingModal() — it resets key to null */
 
   /* Fill form with existing data */
   setTimeout(function () {

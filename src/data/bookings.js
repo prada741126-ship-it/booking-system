@@ -126,6 +126,7 @@ var Bookings = {
             if (data.hasOwnProperty(key) && key.charAt(0) !== '_') {
               /* Respect canEditDates for date fields */
               if ((key === 'checkIn' || key === 'checkOut') && !rules.canEditDates) {
+                console.warn('[Bookings.update] SKIPPING date change: ' + key + ' (canEditDates=' + rules.canEditDates + ')');
                 continue;
               }
               booking[key] = data[key];
@@ -133,11 +134,23 @@ var Bookings = {
           }
 
           /* Recalculate derived fields */
+          var oldCheckIn = booking.checkIn;
+          var oldCheckOut = booking.checkOut;
+          var oldNights = booking.nights;
           booking.nights = Utils.calcNights(booking.checkIn, booking.checkOut);
           booking.month = Utils.getMonthStr(booking.checkIn) || booking.month;
           booking.profit = Bookings.calcProfit(booking);
           booking._updatedAt = Date.now();
           updated = booking;
+
+          /* DEBUG: Log date update */
+          console.log('[Bookings.update] Date change for', fbKey,
+            '| checkIn:', oldCheckIn + '→' + booking.checkIn,
+            '| checkOut:', oldCheckOut + '→' + booking.checkOut,
+            '| nights:', oldNights + '→' + booking.nights,
+            '| _updatedAt:', booking._updatedAt,
+            '| status:', booking.status,
+            '| canEditDates:', rules.canEditDates);
           break;
         }
       }

@@ -259,8 +259,8 @@ var STATUS_RULES = {
   confirmed:   { canEdit: true,  canCancel: true,  canEditDates: true  },
   /* checked-in: can edit check-in date (guest may extend/leave early) */
   'checked-in':{ canEdit: true,  canCancel: false, canEditDates: true  },
-  /* checked-out: locked, auto-archive */
-  'checked-out':{ canEdit: false, canCancel: false, canEditDates: false },
+  /* checked-out: editable for settlement, deferred manual archive */
+  'checked-out':{ canEdit: true, canCancel: false, canEditDates: true },
   /* cancelled: locked, auto-archive */
   cancelled:   { canEdit: false, canCancel: false, canEditDates: false }
 };

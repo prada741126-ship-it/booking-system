@@ -157,10 +157,11 @@ var Uploader = (function () {
 
   function _uploadArrayPath(path, dataArray, type, done) {
     if (!dataArray || dataArray.length === 0) {
-      _db.ref(path).set({}, function (err) {
-        if (err) console.error('[Uploader] Clear path error:', path, err);
-        done(err);
-      });
+      /* SAFETY: Do NOT clear remote data when local is empty.
+         This could happen on a fresh browser or different device.
+         If user truly wants to clear, they must do it explicitly via delete. */
+      console.warn('[Uploader] Local data empty for path:', path, '- skipping upload (NOT clearing remote)');
+      done(null);
       return;
     }
 

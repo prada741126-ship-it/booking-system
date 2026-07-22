@@ -107,7 +107,7 @@ var STATUS_RULES = {
   pending:       { canEdit: true,  canCancel: true,  canEditDates: true  },
   confirmed:     { canEdit: true,  canCancel: true,  canEditDates: true  },
   'checked-in':  { canEdit: true,  canCancel: false, canEditDates: true  },
-  'checked-out': { canEdit: false, canCancel: false, canEditDates: false },
+  'checked-out': { canEdit: true, canCancel: false, canEditDates: true },
   cancelled:     { canEdit: false, canCancel: false, canEditDates: false }
 };
 
@@ -364,6 +364,23 @@ function generateBookingNo() {
   var dd = String(now.getDate()).padStart(2, '0');
   var r = Math.floor(1000 + Math.random() * 9000);
   return 'B' + yy + mm + dd + '-' + r;
+}
+
+/* Format booking number for display — handles old/malformed formats gracefully */
+function formatBookingNo(booking) {
+  if (!booking) return '--';
+  var bn = booking.bookingNo;
+  /* Valid format: B + 6 digits + - + 4 digits (e.g. B260718-1234) */
+  if (bn && /^B\d{6}-\d{4}$/.test(bn)) {
+    return bn;
+  }
+  /* Fallback to shortened Firebase key */
+  if (booking._fbKey) {
+    return '#' + booking._fbKey.slice(0, 10);
+  }
+  /* Last resort: truncate whatever bookingNo we have */
+  if (bn) return String(bn).slice(0, 16);
+  return '--';
 }
 
 /* Encode Firebase key (replace invalid chars) */
@@ -773,6 +790,28 @@ function getActiveAgents() {
     }
   }
   return agents;
+}
+
+/* Get display-friendly agent name. Falls back to "⚠️未命名(…)" for agents without a name */
+function agentDisplayName(nameOrKey) {
+  if (!nameOrKey) return '--';
+  if (!cache.agentList) return String(nameOrKey);
+  /* First try to match by name */
+  for (var k in cache.agentList) {
+    if (cache.agentList.hasOwnProperty(k)) {
+      var ag = cache.agentList[k];
+      if (ag && ag.name === nameOrKey) return nameOrKey; /* Found by name — good */
+    }
+  }
+  /* If matched by key (unnamed agent), show truncated key */
+  if (cache.agentList[nameOrKey]) {
+    return '⚠️未命名(' + String(nameOrKey).slice(0, 8) + '…)';
+  }
+  /* Not in cache — show as-is but hint if it looks like a raw key */
+  if (/^[A-Z]\d{10,}$/.test(String(nameOrKey))) {
+    return '⚠️未命名(' + String(nameOrKey).slice(0, 8) + '…)';
+  }
+  return String(nameOrKey);
 }
 
 /* Employee list helpers (from cache) */
@@ -1252,6 +1291,7 @@ function getRoomLabel(roomType) {
  * ============================================================ */
 
 var sessions = {};
+var welcomedUsers = {}; /* Track users who have received the welcome guide */
 
 function getSession(userId) {
   if (sessions[userId]) {
@@ -1307,7 +1347,8 @@ var STEPS = {
   CANCEL_CONFIRM:    'cancel_confirm',
   AUTH_TGID:         'auth_tgid',
   AUTH_NAME:         'auth_name',
-  AUTH_ROLE:         'auth_role'
+  AUTH_ROLE:         'auth_role',
+  FIX_AGENT_NAME:    'fix_agent_name'
 };
 
 /* Build InlineKeyboard */
@@ -1468,7 +1509,8 @@ function handleHelp(msg) {
   text += '✏️ <b>/修改</b> — 修改订房资料（日期/备注等）\n';
   text += '❌ <b>/取消</b> — 取消订房\n';
   text += '📋 <b>/查询</b> — 查询订房记录\n';
-  text += '🔑 <b>/新增授权</b> — 管理员授权新员工 [管理员]\n\n';
+  text += '🔑 <b>/新增授权</b> — 管理员授权新员工 [管理员]\n';
+  text += '🔧 <b>/修代理</b> — 修复未命名的代理名称 [管理员]\n\n';
   text += '<b>订房流程：</b>\n';
   text += '1. 贴上订房文字（姓名/入住/退房/备注）\n';
   text += '2. 按钮选择酒店体系 → 酒店 → 房型\n';
@@ -1641,7 +1683,7 @@ function agentKB(employeeId) {
   for (var j = 0; j < allAgents.length; j++) {
     /* Skip if already in recent */
     if (recent.indexOf(allAgents[j]) !== -1) continue;
-    row.push({ text: allAgents[j], callback_data: 'agent:' + allAgents[j] });
+    row.push({ text: agentDisplayName(allAgents[j]), callback_data: 'agent:' + allAgents[j] });
     if (row.length === 2) {
       rows.push(row);
       row = [];
@@ -1876,7 +1918,7 @@ function submitBooking(chatId, userId, session, user) {
 
     /* Success message */
     var text = '✅ <b>订房已建立！</b>\n\n';
-    text += '📋 訂單編號：<code>' + bookingNo + '</code>\n';
+    text += '📋 订单编号：<code>' + bookingNo + '</code>\n';
     text += '👤 客人：' + escapeHtml(booking.guestName) + '\n';
     text += '🏨 ' + booking.casino + ' / ' + booking.hotel + '\n';
     text += '🛏️ ' + getRoomLabel(booking.roomType) + '\n';
@@ -1887,11 +1929,21 @@ function submitBooking(chatId, userId, session, user) {
     var bWsLabel = WORK_STATUS_LABELS[booking.workStatus] || WORK_STATUS_LABELS[WORK_STATUS.NOT_STARTED];
     text += bWsIcon + ' 开工：' + bWsLabel + '\n';
     text += '\n⏳ 状态：<b>待确认</b>\n';
-    text += '收到公关确认号后，请使用 /确认号 填入。\n';
-    text += '💡 如公关一次回复多个确认号，直接把消息粘贴或转发给 Bot 即可自动识别。';
+    text += '收到公关确认号后，请点击下方按钮填入。';
 
     clearSession(userId);
-    sendMessage(chatId, text, mainMenuKB(getEmployeeByTgId(user.id)));
+    var cardKb = kb([
+      [
+        { text: '✏️ 修改', callback_data: 'act_modify:' + fbKey },
+        { text: '❌ 取消', callback_data: 'act_cancel:' + fbKey }
+      ],
+      [
+        { text: '🔢 填确认号', callback_data: 'act_confirmno:' + fbKey },
+        { text: '📋 查详情', callback_data: 'act_detail:' + fbKey }
+      ],
+      [{ text: '🏠 返回主选单', callback_data: 'book_cancel' }]
+    ]);
+    sendMessage(chatId, text, cardKb);
   });
 }
 
@@ -2663,7 +2715,7 @@ function buildQueryListMessage(bookings, page, summaryText) {
     text += '   📅 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?');
     text += ' (' + (b.nights || 0) + '晚)\n';
     if (b.confirmNo) text += '   🔢 确认号：' + escapeHtml(b.confirmNo) + '\n';
-    if (b.agent) text += '   👤 代理：' + escapeHtml(b.agent) + '\n';
+    if (b.agent) text += '   👤 代理：' + escapeHtml(agentDisplayName(b.agent)) + '\n';
     var qWs = b.workStatus || WORK_STATUS.NOT_STARTED;
     var qWsIcon = (qWs === WORK_STATUS.WORKING) ? '▶️' : '⏸️';
     text += '   ' + qWsIcon + ' 开工：' + WORK_STATUS_LABELS[qWs] + '\n';
@@ -2854,6 +2906,30 @@ function handleCallback(cb) {
     if (data === 'cmd_query') { startQuery(userId, chatId, user); return; }
     if (data === 'cmd_today_checkin') { startTodayCheckIn(userId, chatId, user); return; }
     if (data === 'cmd_newauth') { startNewAuth(userId, chatId, user); return; }
+
+    /* Quick action handlers from booking success card */
+    if (data.indexOf('act_modify:') === 0) {
+      handleCardModify(userId, chatId, data.substring(11));
+      return;
+    }
+    if (data.indexOf('act_cancel:') === 0) {
+      handleCardCancel(userId, chatId, data.substring(11));
+      return;
+    }
+    if (data.indexOf('act_confirmno:') === 0) {
+      handleCardConfirmNo(userId, chatId, data.substring(15));
+      return;
+    }
+    if (data.indexOf('act_detail:') === 0) {
+      handleCardDetail(userId, chatId, data.substring(11));
+      return;
+    }
+
+    /* Fix agent callback */
+    if (data.indexOf('fixagent:') === 0) {
+      handleFixAgentPrompt(userId, chatId, data.substring(9));
+      return;
+    }
 
     /* Booking flow callbacks */
     var session = getSession(userId);
@@ -3269,6 +3345,13 @@ function handleText(msg) {
     return;
   }
 
+  if (cmd === '/修代理' || cmd === '/fixagent') {
+    checkAuth(msg, function (ok) {
+      if (ok) startFixAgent(userId, chatId, msg.from);
+    });
+    return;
+  }
+
   if (cmd === '/help') {
     handleHelp(msg);
     return;
@@ -3284,10 +3367,16 @@ function handleText(msg) {
 
     var session = getSession(userId);
 
-    /* In groups: ignore non-mention messages (unless user is in a session) */
+    /* In groups: ignore non-mention messages (unless user is in an active session in this chat) */
     if (isGroup && !mentioned && !session) {
       /* Don't respond — avoid noise in group chats */
       return;
+    }
+
+    /* In groups: if session exists but is for a different chat (e.g. private chat session leaking into group), clear it */
+    if (isGroup && session && session.chatId !== chatId) {
+      clearSession(userId);
+      session = null;
     }
 
     /* In groups with @mention or in private chat: show main menu */
@@ -3302,9 +3391,34 @@ function handleText(msg) {
 
       var emp = getEmployeeByTgId(userId);
       var name = emp ? emp.name : getDisplayName(msg.from);
-      var roleLabel = (emp && emp.role === EMPLOYEE_ROLES.ADMIN) ? ' 🔑管理员' : '';
+      var roleLabel = (emp && emp.role === EMPLOYEE_ROLES.ADMIN) ? ' [管理员]' : '';
 
-      var greet = '👋 您好，<b>' + escapeHtml(name) + '</b>' + roleLabel + '\n\n';
+      /* === Group chat: concise professional response === */
+      if (isGroup) {
+        var groupGreet = '<b>BookingHub 订房系统</b>\n';
+        groupGreet += '操作人：' + escapeHtml(name) + roleLabel + '\n';
+        groupGreet += '请选择操作：';
+        sendMessage(chatId, groupGreet, mainMenuKB(emp));
+        return;
+      }
+
+      /* === Private chat: friendly guided experience === */
+      /* First-time welcome guide */
+      if (!welcomedUsers[userId]) {
+        welcomedUsers[userId] = true;
+        var welcomeText = '<b>欢迎使用 BookingHub 订房助手</b>\n\n';
+        welcomeText += '常用操作说明：\n';
+        welcomeText += '📝 订房 — 直接粘贴订房文字或点击按钮逐步选择\n';
+        welcomeText += '✏️ 修改 — 修改已建立的订房资料\n';
+        welcomeText += '❌ 取消 — 取消不需要的订房\n';
+        welcomeText += '📋 查询 — 查看所有订房记录\n';
+        welcomeText += '✅ 确认号 — 填入公关回复的确认编号\n';
+        welcomeText += '🔑 今日入住 — 查看今日入住名单\n\n';
+        welcomeText += '发送 /help 查看完整操作说明。';
+        sendMessage(chatId, welcomeText, null);
+      }
+
+      var greet = '您好，' + escapeHtml(name) + roleLabel + '\n\n';
       greet += '请选择以下操作：';
 
       sendMessage(chatId, greet, mainMenuKB(emp));
@@ -3393,6 +3507,10 @@ function handleText(msg) {
       case STEPS.AUTH_TGID:
       case STEPS.AUTH_NAME:
         handleAuthFlow(userId, chatId, text, msg.from);
+        break;
+
+      case STEPS.FIX_AGENT_NAME:
+        executeFixAgent(userId, chatId, text);
         break;
 
       default:
@@ -3640,7 +3758,7 @@ function sendTodayCheckInReminders(bookingsData) {
     text += '   🏨 ' + (b.casino || '') + ' / ' + (b.hotel || '') + ' / ' + getRoomLabel(b.roomType) + '\n';
     text += '   📅 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?') + ' (' + (b.nights || 0) + '晚)\n';
     if (b.confirmNo) text += '   🔢 确认号：<code>' + escapeHtml(b.confirmNo) + '</code>\n';
-    if (b.agent) text += '   👤 代理：' + escapeHtml(b.agent) + '\n';
+    if (b.agent) text += '   👤 代理：' + escapeHtml(agentDisplayName(b.agent)) + '\n';
     if (b.smoking === 'smoking') text += '   🚬 吸烟房\n';
     if (b.pickupName) text += '   🪧 举牌：' + escapeHtml(b.pickupName) + '\n';
     if (b.remark) text += '   📝 备注：' + escapeHtml(b.remark) + '\n';
@@ -3723,7 +3841,7 @@ function sendTodayCheckOutReminders(bookingsData) {
       text += ' / \u5411\u5ba2\u4eba\u6536\uff1a' + (b.chargeGuest || 0);
     }
     text += '\n';
-    if (b.agent) text += '   \ud83d\udc64 \u4ee3\u7406\uff1a' + escapeHtml(b.agent) + '\n';
+    if (b.agent) text += '   \ud83d\udc64 \u4ee3\u7406\uff1a' + escapeHtml(agentDisplayName(b.agent)) + '\n';
     text += '\n';
   }
 
@@ -3799,7 +3917,7 @@ function startTodayCheckIn(userId, chatId, user) {
       text += '   🏨 ' + (b.casino || '') + ' / ' + (b.hotel || '') + ' / ' + getRoomLabel(b.roomType) + '\n';
       text += '   📅 ' + (b.checkIn || '?') + ' ~ ' + (b.checkOut || '?') + ' (' + (b.nights || 0) + '晚)\n';
       if (b.confirmNo) text += '   🔢 确认号：<code>' + escapeHtml(b.confirmNo) + '</code>\n';
-      if (b.agent) text += '   👤 代理：' + escapeHtml(b.agent) + '\n';
+      if (b.agent) text += '   👤 代理：' + escapeHtml(agentDisplayName(b.agent)) + '\n';
       if (b.smoking === 'smoking') text += '   🚬 吸烟房\n';
       if (b.pickupName) text += '   🪧 举牌：' + escapeHtml(b.pickupName) + '\n';
       if (b.remark) text += '   📝 备注：' + escapeHtml(b.remark) + '\n';
@@ -3947,6 +4065,175 @@ function poll() {
 
   req.write(body);
   req.end();
+}
+
+/* ============================================================
+ * /修代理 — Fix Unnamed Agent
+ * ============================================================ */
+
+function startFixAgent(userId, chatId, user) {
+  var emp = getEmployeeByTgId(user.id);
+  if (!emp || emp.role !== EMPLOYEE_ROLES.ADMIN) {
+    sendMessage(chatId, '⛔ 此功能仅限管理员使用。', mainMenuKB(emp));
+    return;
+  }
+
+  if (!cache.agentList) {
+    sendMessage(chatId, '⚠️ 暂无代理数据。请先在 Web 端添加代理。', mainMenuKB(emp));
+    return;
+  }
+
+  var unnamedAgents = [];
+  for (var key in cache.agentList) {
+    if (cache.agentList.hasOwnProperty(key)) {
+      var a = cache.agentList[key];
+      if (a && a.active !== false && !a.name) {
+        unnamedAgents.push({ key: key, data: a });
+      }
+    }
+  }
+
+  if (unnamedAgents.length === 0) {
+    sendMessage(chatId, '✅ 所有代理均有名称，无需修复。', mainMenuKB(emp));
+    return;
+  }
+
+  var text = '<b>🔧 修复未命名代理</b>\n\n';
+  text += '以下代理缺少名称（显示为 ⚠️ 未命名）：\n\n';
+  var rows = [];
+  for (var i = 0; i < unnamedAgents.length; i++) {
+    var ua = unnamedAgents[i];
+    text += (i + 1) + '. Firebase Key: <code>' + ua.key + '</code>\n';
+    rows.push([{ text: '✏️ 修复 ' + ua.key.slice(0, 10) + '…', callback_data: 'fixagent:' + ua.key }]);
+  }
+  text += '\n请点击要修复的代理：';
+  rows.push([{ text: '⬅️ 返回', callback_data: 'book_cancel' }]);
+  sendMessage(chatId, text, kb(rows));
+}
+
+function handleFixAgentPrompt(userId, chatId, fbKey) {
+  if (!isAdmin(userId)) return;
+
+  var session = createSession(userId, chatId);
+  session.step = STEPS.FIX_AGENT_NAME;
+  session.data.fixAgentKey = fbKey;
+
+  var text = '<b>🔧 为代理设置名称</b>\n\n';
+  text += 'Firebase Key: <code>' + fbKey + '</code>\n\n';
+  text += '请输入该代理的<b>正确名称</b>：';
+  sendMessage(chatId, text, kb([[{ text: '⬅️ 取消', callback_data: 'book_cancel' }]]));
+}
+
+function executeFixAgent(userId, chatId, newName) {
+  var session = getSession(userId);
+  if (!session || session.step !== STEPS.FIX_AGENT_NAME) return;
+  var fbKey = session.data.fixAgentKey;
+  if (!fbKey || !newName || !newName.trim()) {
+    sendMessage(chatId, '❌ 名称不能为空，请重新输入：');
+    return;
+  }
+
+  newName = newName.trim();
+  var agentPath = CONFIG.FIREBASE.PATHS.AGENTS + '/' + encodeURIComponent(fbKey);
+  fbGet(CONFIG.FIREBASE.PATHS.AGENTS, function (err, data) {
+    if (err || !data || !data[fbKey]) {
+      sendMessage(chatId, '❌ 找不到该代理记录。', mainMenuKB(getEmployeeByTgId(userId)));
+      clearSession(userId);
+      return;
+    }
+    var agent = data[fbKey];
+    agent.name = newName;
+    fbPut(agentPath, agent, function (putErr) {
+      clearSession(userId);
+      if (putErr) {
+        sendMessage(chatId, '❌ 写入失败：' + putErr.message, mainMenuKB(getEmployeeByTgId(userId)));
+      } else {
+        sendMessage(chatId, '✅ 代理名称已更新为：<b>' + escapeHtml(newName) + '</b>\n\n请重启 Bot 或等待缓存刷新后生效。', mainMenuKB(getEmployeeByTgId(userId)));
+      }
+    });
+  });
+}
+
+/* ============================================================
+ * Quick Action Handlers (from booking success card)
+ * ============================================================ */
+
+function handleCardModify(userId, chatId, fbKey) {
+  fbGet(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), function (err, booking) {
+    if (err || !booking || booking._deleted) {
+      sendMessage(chatId, '❌ 该订房已不存在。', mainMenuKB(getEmployeeByTgId(userId)));
+      return;
+    }
+    var session = createSession(userId, chatId);
+    session.step = STEPS.MODIFY_OPTIONS;
+    session.data.modifyFbKey = fbKey;
+    showModifyOptions(chatId, userId, fbKey);
+  });
+}
+
+function handleCardCancel(userId, chatId, fbKey) {
+  fbGet(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), function (err, booking) {
+    if (err || !booking || booking._deleted) {
+      sendMessage(chatId, '❌ 该订房已不存在。', mainMenuKB(getEmployeeByTgId(userId)));
+      return;
+    }
+    var statusRules = STATUS_RULES[booking.status] || {};
+    if (statusRules.canCancel === false) {
+      sendMessage(chatId, '❌ 该订房当前状态（' + booking.status + '）不允许取消。', mainMenuKB(getEmployeeByTgId(userId)));
+      return;
+    }
+    var text = '⚠️ <b>确认取消此订房？</b>\n\n';
+    text += '👤 客人：<b>' + escapeHtml(booking.guestName || '-') + '</b>\n';
+    text += '🏨 ' + (booking.casino || '') + ' / ' + (booking.hotel || '') + '\n';
+    text += '📅 ' + (booking.checkIn || '?') + ' ~ ' + (booking.checkOut || '?') + '\n';
+    text += '\n此操作不可撤销，请确认：';
+    sendMessage(chatId, text, kb([
+      [{ text: '✅ 确认取消', callback_data: 'cnl_yes:' + fbKey }, { text: '❌ 不取消', callback_data: 'book_cancel' }]
+    ]));
+  });
+}
+
+function handleCardConfirmNo(userId, chatId, fbKey) {
+  fbGet(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), function (err, booking) {
+    if (err || !booking || booking._deleted) {
+      sendMessage(chatId, '❌ 该订房已不存在。', mainMenuKB(getEmployeeByTgId(userId)));
+      return;
+    }
+    if (booking.status === 'cancelled') {
+      sendMessage(chatId, '❌ 该订房已取消。', mainMenuKB(getEmployeeByTgId(userId)));
+      return;
+    }
+    var session = createSession(userId, chatId);
+    session.step = STEPS.CONFIRMNO_INPUT;
+    session.data.selectedBookingKey = fbKey;
+    var text = '🔢 <b>填入确认号</b>\n\n';
+    text += '👤 客人：<b>' + escapeHtml(booking.guestName || '-') + '</b>\n';
+    text += '🏨 ' + (booking.casino || '') + ' / ' + (booking.hotel || '') + '\n';
+    text += '📅 ' + (booking.checkIn || '?') + ' ~ ' + (booking.checkOut || '?') + '\n\n';
+    text += '请直接输入公关给的确认号：';
+    sendMessage(chatId, text, kb([[{ text: '⬅️ 返回', callback_data: 'book_cancel' }]]));
+  });
+}
+
+function handleCardDetail(userId, chatId, fbKey) {
+  fbGet(CONFIG.FIREBASE.PATHS.BOOKINGS + '/' + encodeURIComponent(fbKey), function (err, booking) {
+    if (err || !booking || booking._deleted) {
+      sendMessage(chatId, '❌ 该订房已不存在。', mainMenuKB(getEmployeeByTgId(userId)));
+      return;
+    }
+    var text = '📋 <b>订房详情</b>\n\n';
+    text += '📋 订单编号：<code>' + formatBookingNo(booking) + '</code>\n';
+    text += '👤 客人：<b>' + escapeHtml(booking.guestName || '-') + '</b>\n';
+    text += '🏨 ' + (booking.casino || '') + ' / ' + (booking.hotel || '') + '\n';
+    text += '🛏️ ' + getRoomLabel(booking.roomType) + '\n';
+    text += '📅 ' + (booking.checkIn || '?') + ' ~ ' + (booking.checkOut || '?') + '（' + (booking.nights || 0) + '晚）\n';
+    if (booking.agent) text += '👤 代理：' + escapeHtml(agentDisplayName(booking.agent)) + '\n';
+    if (booking.confirmNo) text += '🔢 确认号：<code>' + escapeHtml(booking.confirmNo) + '</code>\n';
+    text += '💰 费用类型：' + (booking.feeStatus === 'paid' ? '收费订房' : '免费订房') + '\n';
+    text += '⏳ 状态：<b>' + (booking.status || 'pending') + '</b>\n';
+    if (booking.remark) text += '📝 备注：' + escapeHtml(booking.remark) + '\n';
+    sendMessage(chatId, text, mainMenuKB(getEmployeeByTgId(userId)));
+  });
 }
 
 function startPolling() {
