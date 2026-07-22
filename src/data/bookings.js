@@ -121,19 +121,11 @@ var Bookings = {
             return list;
           }
 
-          /* Capture old values BEFORE mutation (for debug logging) */
-          var oldCheckIn = booking.checkIn;
-          var oldCheckOut = booking.checkOut;
-          var oldNights = booking.nights;
-
           /* Merge data into existing */
           for (var key in data) {
             if (data.hasOwnProperty(key) && key.charAt(0) !== '_') {
               /* Respect canEditDates for date fields */
-              if ((key === 'checkIn' || key === 'checkOut') && !rules.canEditDates) {
-                console.warn('[Bookings.update] SKIPPING date change: ' + key + ' (canEditDates=' + rules.canEditDates + ')');
-                continue;
-              }
+              if ((key === 'checkIn' || key === 'checkOut') && !rules.canEditDates) continue;
               booking[key] = data[key];
             }
           }
@@ -143,16 +135,15 @@ var Bookings = {
           booking.month = Utils.getMonthStr(booking.checkIn) || booking.month;
           booking.profit = Bookings.calcProfit(booking);
           booking._updatedAt = Date.now();
-          updated = booking;
 
-          /* DEBUG: Log date update */
-          console.log('[Bookings.update] Date change for', fbKey,
-            '| checkIn:', oldCheckIn + '→' + booking.checkIn,
-            '| checkOut:', oldCheckOut + '→' + booking.checkOut,
-            '| nights:', oldNights + '→' + booking.nights,
-            '| _updatedAt:', booking._updatedAt,
-            '| status:', booking.status,
-            '| canEditDates:', rules.canEditDates);
+          /* Sync date in guestName if it embeds a date range
+           * (e.g. Bot-created "洪秉豐 07/20-07/22 映星匯雙床（禁）") */
+          if (booking.guestName && /\s+\d{2}\/\d{2}-\d{2}\/\d{2}\b/.test(booking.guestName)) {
+            var newRange = Utils.formatDateDisplay(booking.checkIn) + '-' + Utils.formatDateDisplay(booking.checkOut);
+            booking.guestName = booking.guestName.replace(/\s+\d{2}\/\d{2}-\d{2}\/\d{2}\b/, ' ' + newRange);
+          }
+
+          updated = booking;
           break;
         }
       }

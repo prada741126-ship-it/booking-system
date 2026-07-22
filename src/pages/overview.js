@@ -280,17 +280,16 @@ var OverviewPage = (function () {
   }
 
   function _recentRow(b) {
-    /* DEBUG: Log rendered booking */
-    console.log('[Overview._recentRow]', b.guestName,
-      '| checkIn:', b.checkIn,
-      '| checkOut:', b.checkOut,
-      '| nights:', b.nights,
-      '| _fbKey:', b._fbKey,
-      '| _updatedAt:', b._updatedAt,
-      '| status:', b.status);
+
+    /* Fix: if guestName embeds a date range, always use actual checkIn/checkOut */
+    var displayName = b.guestName || '-';
+    if (/\s+\d{2}\/\d{2}-\d{2}\/\d{2}\b/.test(displayName)) {
+      var actualRange = Utils.formatDateDisplay(b.checkIn) + '-' + Utils.formatDateDisplay(b.checkOut);
+      displayName = displayName.replace(/\s+\d{2}\/\d{2}-\d{2}\/\d{2}\b/, ' ' + actualRange);
+    }
 
     var html = '<tr style="cursor:pointer;" onclick="viewBookingDetail(\'' + b._fbKey + '\')">';
-    html += '<td style="font-weight:600;">' + Utils.escapeHtml(b.guestName || '-') + '</td>';
+    html += '<td style="font-weight:600;">' + Utils.escapeHtml(displayName) + '</td>';
     html += '<td>' + Utils.escapeHtml(b.casino || '-') + '</td>';
     html += '<td style="font-size:var(--fs-sm);">' + Utils.formatDateDisplay(b.checkIn) + '</td>';
     html += '<td style="font-size:var(--fs-sm);">' + Utils.formatDateDisplay(b.checkOut) + '</td>';
